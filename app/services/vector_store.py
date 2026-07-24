@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -12,7 +12,7 @@ class VectorStore:
     def __init__(self) -> None:
         settings = get_settings()
         self._collection = settings.qdrant_collection
-        self._client = QdrantClient(url=settings.qdrant_url)
+        self._client = QdrantClient(url=settings.qdrant_url, check_compatibility=False)
 
     def ping(self) -> bool:
         try:
@@ -21,9 +21,15 @@ class VectorStore:
         except Exception:
             return False
 
+    def collection_exists(self) -> bool:
+        try:
+            collections = self._client.get_collections().collections
+        except Exception:
+            return False
+        return any(item.name == self._collection for item in collections)
+
     def ensure_collection(self, vector_size: int) -> None:
-        collections = self._client.get_collections().collections
-        if any(item.name == self._collection for item in collections):
+        if self.collection_exists():
             return
         self._client.create_collection(
             collection_name=self._collection,
@@ -63,6 +69,60 @@ class VectorStore:
             )
         return normalized
 
+    def list_indexed_documents(self) -> list[dict[str, Any]]:
+        if not self.collection_exists():
+            return []
+
+        documents: dict[str, dict[str, Any]] = {}
+        next_offset = None
+        while True:
+            points, next_offset = self._client.scroll(
+                collection_name=self._collection,
+                limit=256,
+                offset=next_offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for point in points:
+                payload = point.payload or {}
+                file_path = str(payload.get("file_path", "")).strip()
+                if not file_path:
+                    continue
+                entry = documents.setdefault(
+                    file_path,
+                    {
+                        "file_path": file_path,
+                        "filename": file_path.replace("\\", "/").split("/")[-1],
+                        "title": payload.get("title", ""),
+                        "source_label": str(payload.get("source", "manual")),
+                        "category": str(payload.get("category", "general")),
+                        "chunk_count": 0,
+                    },
+                )
+                entry["chunk_count"] += 1
+            if next_offset is None:
+                break
+
+        return sorted(documents.values(), key=lambda item: item["file_path"])
+
+    def delete_by_file_path(self, file_path: str) -> None:
+        if not self.collection_exists():
+            return
+        self._client.delete(
+            collection_name=self._collection,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="file_path",
+                            match=models.MatchValue(value=file_path),
+                        )
+                    ]
+                )
+            ),
+            wait=True,
+        )
+
 
 _vector_store: VectorStore | None = None
 
@@ -72,4 +132,3 @@ def get_vector_store() -> VectorStore:
     if _vector_store is None:
         _vector_store = VectorStore()
     return _vector_store
-

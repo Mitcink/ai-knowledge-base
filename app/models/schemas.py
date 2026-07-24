@@ -1,4 +1,4 @@
-from typing import Any
+﻿from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -17,15 +17,34 @@ class DocumentIngestResponse(BaseModel):
     category: str | None = None
 
 
-class DocumentListItem(BaseModel):
+class ManagedDocumentItem(BaseModel):
     filename: str
     relative_path: str
-    size_bytes: int
+    size_bytes: int | None = None
     category: str
+    source_label: str
+    storage_area: str
+    indexed: bool
+    chunk_count: int
+    exists_on_disk: bool
 
 
 class DocumentListResponse(BaseModel):
-    documents: list[DocumentListItem]
+    documents: list[ManagedDocumentItem]
+
+
+class DocumentDeleteRequest(BaseModel):
+    storage_area: str = Field(description="raw or upload")
+    relative_path: str = Field(description="Path relative to the storage area root")
+    delete_file: bool = True
+    delete_index: bool = True
+
+
+class DocumentDeleteResponse(BaseModel):
+    filename: str
+    deleted_file: bool
+    deleted_index: bool
+    message: str
 
 
 class QueryRequest(BaseModel):
