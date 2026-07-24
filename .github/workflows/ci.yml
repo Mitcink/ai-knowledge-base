@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+
+jobs:
+  python-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install API dependencies
+        run: pip install -r requirements-api.txt
+
+      - name: Install UI dependencies
+        run: pip install -r requirements-ui.txt
+
+      - name: Compile Python files
+        run: python -m py_compile app/main.py app/api/routes/health.py app/api/routes/documents.py app/api/routes/query.py app/config/settings.py app/models/schemas.py app/services/chunking.py app/services/document_loader.py app/services/embeddings.py app/services/vector_store.py app/services/rag_service.py scripts/ingest.py ui/streamlit_app.py

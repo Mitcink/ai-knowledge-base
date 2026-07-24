@@ -1,0 +1,37 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: kb-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: kb-api
+    env_file:
+      - .env
+    depends_on:
+      - qdrant
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: kb-ui
+    env_file:
+      - .env
+    depends_on:
+      - api
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE_URL: http://api:8000
+
