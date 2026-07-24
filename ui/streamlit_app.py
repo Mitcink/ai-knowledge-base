@@ -6,6 +6,7 @@ import streamlit as st
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 REQUEST_TIMEOUT = 30
+MAX_RECENT_TAGS = 20
 
 
 st.set_page_config(page_title="AI知识库", page_icon=":books:", layout="wide")
@@ -18,6 +19,10 @@ if "documents_cache" not in st.session_state:
     st.session_state["documents_cache"] = []
 if "documents_loaded" not in st.session_state:
     st.session_state["documents_loaded"] = False
+if "top_k" not in st.session_state:
+    st.session_state["top_k"] = 6
+if "recent_tags" not in st.session_state:
+    st.session_state["recent_tags"] = []
 
 
 def fetch_documents(force_refresh: bool = False) -> list[dict]:
@@ -30,6 +35,19 @@ def fetch_documents(force_refresh: bool = False) -> list[dict]:
     st.session_state["documents_cache"] = documents
     st.session_state["documents_loaded"] = True
     return documents
+
+
+def update_recent_tags(tag: str) -> None:
+    cleaned = tag.strip()
+    if not cleaned:
+        return
+    remaining = [item for item in st.session_state["recent_tags"] if item != cleaned]
+    st.session_state["recent_tags"] = [cleaned, *remaining][:MAX_RECENT_TAGS]
+
+
+def change_top_k(delta: int) -> None:
+    current = int(st.session_state["top_k"])
+    st.session_state["top_k"] = max(3, min(10, current + delta))
 
 
 with st.sidebar:
@@ -48,20 +66,45 @@ tab_search, tab_ingest, tab_manage = st.tabs(["智能问答", "上传资料", "�
 
 with tab_search:
     st.subheader("基于知识库提问")
+    counter_col1, counter_col2, counter_col3 = st.columns([1, 2, 1])
+    with counter_col1:
+        st.button("－", key="decrease_top_k", use_container_width=True, on_click=change_top_k, args=(-1,))
+    with counter_col2:
+        st.markdown(
+            (
+                "<div style='text-align:center;border:1px solid #d9d9d9;border-radius:12px;"
+                "padding:0.8rem 0.4rem;background:#fafafa;'>"
+                "<div style='font-size:0.9rem;color:#666;'>召回数量</div>"
+                f"<div style='font-size:1.8rem;font-weight:700;'>{int(st.session_state['top_k'])}</div>"
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+    with counter_col3:
+        st.button("＋", key="increase_top_k", use_container_width=True, on_click=change_top_k, args=(1,))
+
     with st.form("search_form"):
         question = st.text_area(
             "你的问题",
             placeholder="例如：我之前记录过哪些关于 RAG 分块策略的要点？",
             height=120,
         )
-        top_k = st.number_input("召回数量", min_value=3, max_value=10, value=6, step=1)
-        tag_filter = st.text_input("标签过滤", placeholder="例如：pdf、工作、rag")
+        tag_filter = st.selectbox(
+            "标签过滤",
+            options=st.session_state["recent_tags"],
+            index=None,
+            placeholder="输入新标签，或从常用标签中选择",
+            accept_new_options=True,
+        )
+        if st.session_state["recent_tags"]:
+            st.caption("常用标签按最近使用排序展示，列表支持向下滚动查看更多。")
         submitted = st.form_submit_button("开始问答", type="primary")
 
     if submitted:
+        update_recent_tags(tag_filter or "")
         payload = {
             "question": question,
-            "top_k": int(top_k),
+            "top_k": int(st.session_state["top_k"]),
             "tag_filter": tag_filter or None,
         }
         try:
