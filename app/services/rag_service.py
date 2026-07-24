@@ -49,6 +49,7 @@ class RagService:
         source_label: str = "manual",
         category: str | None = None,
     ) -> dict:
+        path = path.resolve()
         text = load_document_text(path)
         category = category or path.parent.name or "general"
         chunks = split_text(
@@ -67,6 +68,7 @@ class RagService:
 
         vectors = self._embedding_client.embed_texts([chunk.content for chunk in chunks])
         self._vector_store.ensure_collection(vector_size=len(vectors[0]))
+        self._vector_store.delete_by_file_path(str(path))
 
         points: list[models.PointStruct] = []
         for chunk, vector in zip(chunks, vectors, strict=True):
@@ -93,6 +95,14 @@ class RagService:
             "source_label": source_label,
             "category": category,
         }
+
+    def ingest_raw_directory(self, source_label: str | None = None) -> list[dict]:
+        raw_dir = Path(self._settings.raw_data_dir)
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        return self.ingest_directory(
+            raw_dir,
+            source_label=source_label or self._settings.auto_ingest_source_label,
+        )
 
     def answer_question(self, question: str, top_k: int | None = None, tag_filter: str | None = None) -> dict:
         top_k = top_k or self._settings.top_k

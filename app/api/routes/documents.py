@@ -4,11 +4,13 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.config.settings import get_settings
 from app.models.schemas import (
+    BulkIngestResponse,
     DocumentDeleteRequest,
     DocumentDeleteResponse,
     DocumentIngestRequest,
     DocumentIngestResponse,
     DocumentListResponse,
+    SystemOverviewResponse,
 )
 from app.services.rag_service import get_rag_service
 from app.services.vector_store import get_vector_store
@@ -19,6 +21,44 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 @router.get("", response_model=DocumentListResponse)
 def list_documents() -> DocumentListResponse:
+    return DocumentListResponse(documents=_build_document_inventory())
+
+
+@router.get("/overview", response_model=SystemOverviewResponse)
+def get_system_overview() -> SystemOverviewResponse:
+    settings = get_settings()
+    documents = _build_document_inventory()
+    vector_store = get_vector_store()
+    qdrant_reachable = vector_store.ping()
+    indexed_documents = sum(1 for item in documents if item["indexed"])
+    total_chunks = vector_store.count_points() if qdrant_reachable else sum(item["chunk_count"] for item in documents)
+
+    return SystemOverviewResponse(
+        status="ok" if qdrant_reachable else "degraded",
+        app_name="AI Knowledge Base",
+        collection=settings.qdrant_collection,
+        qdrant_reachable=qdrant_reachable,
+        collection_exists=vector_store.collection_exists(),
+        openai_configured=bool(settings.openai_api_key),
+        raw_data_dir=str(Path(settings.raw_data_dir).resolve()),
+        upload_dir=str(Path(settings.upload_dir).resolve()),
+        total_documents=len(documents),
+        indexed_documents=indexed_documents,
+        total_chunks=total_chunks,
+        categories=sorted({item["category"] for item in documents}),
+        storage_areas=sorted({item["storage_area"] for item in documents}),
+    )
+
+
+@router.post("/ingest/raw", response_model=BulkIngestResponse)
+def ingest_raw_documents() -> BulkIngestResponse:
+    service = get_rag_service()
+    summaries = service.ingest_raw_directory()
+    normalized = [DocumentIngestResponse(**summary) for summary in summaries]
+    return BulkIngestResponse(ingested_count=len(normalized), summaries=normalized)
+
+
+def _build_document_inventory() -> list[dict]:
     settings = get_settings()
     raw_dir = Path(settings.raw_data_dir).resolve()
     upload_dir = Path(settings.upload_dir).resolve()
@@ -52,8 +92,7 @@ def list_documents() -> DocumentListResponse:
         existing["source_label"] = item["source_label"] or existing["source_label"]
         existing["category"] = item["category"] or existing["category"]
 
-    ordered = [documents[key] for key in sorted(documents.keys())]
-    return DocumentListResponse(documents=ordered)
+    return [documents[key] for key in sorted(documents.keys())]
 
 
 @router.post("/upload", response_model=DocumentIngestResponse)

@@ -17,6 +17,11 @@ class DocumentIngestResponse(BaseModel):
     category: str | None = None
 
 
+class BulkIngestResponse(BaseModel):
+    ingested_count: int
+    summaries: list[DocumentIngestResponse]
+
+
 class ManagedDocumentItem(BaseModel):
     filename: str
     relative_path: str
@@ -31,6 +36,22 @@ class ManagedDocumentItem(BaseModel):
 
 class DocumentListResponse(BaseModel):
     documents: list[ManagedDocumentItem]
+
+
+class SystemOverviewResponse(BaseModel):
+    status: str
+    app_name: str
+    collection: str
+    qdrant_reachable: bool
+    collection_exists: bool
+    openai_configured: bool
+    raw_data_dir: str
+    upload_dir: str
+    total_documents: int
+    indexed_documents: int
+    total_chunks: int
+    categories: list[str]
+    storage_areas: list[str]
 
 
 class DocumentDeleteRequest(BaseModel):

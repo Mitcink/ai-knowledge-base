@@ -13,7 +13,7 @@ def is_supported_file(path: Path) -> bool:
 def load_document_text(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix in {".md", ".markdown", ".txt"}:
-        return path.read_text(encoding="utf-8")
+        return _read_text_with_fallback(path)
     if suffix == ".pdf":
         return _load_pdf_text(path)
     raise ValueError(f"Unsupported file type: {suffix}")
@@ -24,3 +24,11 @@ def _load_pdf_text(path: Path) -> str:
     pages = [page.extract_text() or "" for page in reader.pages]
     return "\n".join(pages)
 
+
+def _read_text_with_fallback(path: Path) -> str:
+    for encoding in ("utf-8", "utf-8-sig", "gb18030"):
+        try:
+            return path.read_text(encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+    return path.read_text(encoding="utf-8", errors="ignore")

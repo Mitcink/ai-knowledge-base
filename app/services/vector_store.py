@@ -123,6 +123,11 @@ class VectorStore:
             wait=True,
         )
 
+    def count_points(self) -> int:
+        if not self.collection_exists():
+            return 0
+        return int(self._client.count(collection_name=self._collection, exact=True).count)
+
 
 _vector_store: VectorStore | None = None
 
