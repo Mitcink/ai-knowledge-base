@@ -44,6 +44,8 @@ class VectorStore:
         query_vector: list[float],
         limit: int,
         category_filter: str | None = None,
+        source_filter: str | None = None,
+        file_type_filter: str | None = None,
         tag_filter: str | None = None,
     ) -> list[dict[str, Any]]:
         if not self.collection_exists():
@@ -55,6 +57,20 @@ class VectorStore:
                 models.FieldCondition(
                     key="category",
                     match=models.MatchValue(value=category_filter),
+                )
+            )
+        if source_filter:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="source",
+                    match=models.MatchValue(value=source_filter),
+                )
+            )
+        if file_type_filter:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="tags",
+                    match=models.MatchValue(value=file_type_filter),
                 )
             )
         if tag_filter:

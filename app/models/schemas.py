@@ -72,6 +72,8 @@ class QueryRequest(BaseModel):
     question: str
     top_k: int = 6
     category_filter: str | None = None
+    source_filter: str | None = None
+    file_type_filter: str | None = None
     tag_filter: str | None = None
 
 

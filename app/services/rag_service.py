@@ -109,6 +109,8 @@ class RagService:
         question: str,
         top_k: int | None = None,
         category_filter: str | None = None,
+        source_filter: str | None = None,
+        file_type_filter: str | None = None,
         tag_filter: str | None = None,
     ) -> dict:
         top_k = top_k or self._settings.top_k
@@ -117,6 +119,8 @@ class RagService:
             query_vector=query_vector,
             limit=max(top_k * 3, top_k),
             category_filter=category_filter,
+            source_filter=source_filter,
+            file_type_filter=file_type_filter,
             tag_filter=tag_filter,
         )
         ranked = self._rerank(question, candidates)[:top_k]
@@ -129,6 +133,8 @@ class RagService:
                     "retrieved_candidates": 0,
                     "returned_citations": 0,
                     "category_filter": category_filter,
+                    "source_filter": source_filter,
+                    "file_type_filter": file_type_filter,
                     "tag_filter": tag_filter,
                 },
             }
@@ -159,6 +165,8 @@ class RagService:
                 "retrieved_candidates": len(candidates),
                 "returned_citations": len(citations),
                 "category_filter": category_filter,
+                "source_filter": source_filter,
+                "file_type_filter": file_type_filter,
                 "tag_filter": tag_filter,
             },
         }

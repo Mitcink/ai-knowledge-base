@@ -15,6 +15,8 @@ def answer_query(request: QueryRequest) -> QueryResponse:
             question=request.question,
             top_k=request.top_k,
             category_filter=request.category_filter,
+            source_filter=request.source_filter,
+            file_type_filter=request.file_type_filter,
             tag_filter=request.tag_filter,
         )
         return QueryResponse(**result)
