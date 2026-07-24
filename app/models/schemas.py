@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class DocumentIngestRequest(BaseModel):
     path: str = Field(description="Absolute or project-relative path to a document.")
     source_label: str = Field(default="manual", description="Logical source label for metadata.")
+    category: str | None = Field(default=None, description="Optional category label.")
 
 
 class DocumentIngestResponse(BaseModel):
@@ -13,12 +14,14 @@ class DocumentIngestResponse(BaseModel):
     chunks_created: int
     points_written: int
     source_label: str
+    category: str | None = None
 
 
 class DocumentListItem(BaseModel):
     filename: str
     relative_path: str
     size_bytes: int
+    category: str
 
 
 class DocumentListResponse(BaseModel):
@@ -44,4 +47,3 @@ class QueryResponse(BaseModel):
     answer: str
     citations: list[Citation]
     debug: dict[str, Any]
-

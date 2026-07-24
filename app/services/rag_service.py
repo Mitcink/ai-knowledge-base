@@ -24,15 +24,33 @@ class RagService:
             base_url=settings.openai_base_url,
         )
 
-    def ingest_directory(self, directory: Path, source_label: str = "batch") -> list[dict]:
+    def ingest_directory(
+        self,
+        directory: Path,
+        source_label: str = "batch",
+        default_category: str | None = None,
+    ) -> list[dict]:
         summaries = []
         for path in sorted(directory.rglob("*")):
             if path.is_file() and is_supported_file(path):
-                summaries.append(self.ingest_file(path, source_label=source_label))
+                category = default_category or self._infer_category(directory, path)
+                summaries.append(
+                    self.ingest_file(
+                        path,
+                        source_label=source_label,
+                        category=category,
+                    )
+                )
         return summaries
 
-    def ingest_file(self, path: Path, source_label: str = "manual") -> dict:
+    def ingest_file(
+        self,
+        path: Path,
+        source_label: str = "manual",
+        category: str | None = None,
+    ) -> dict:
         text = load_document_text(path)
+        category = category or path.parent.name or "general"
         chunks = split_text(
             text=text,
             chunk_size=self._settings.max_chunk_size,
@@ -44,6 +62,7 @@ class RagService:
                 "chunks_created": 0,
                 "points_written": 0,
                 "source_label": source_label,
+                "category": category,
             }
 
         vectors = self._embedding_client.embed_texts([chunk.content for chunk in chunks])
@@ -61,7 +80,8 @@ class RagService:
                         "file_path": str(path),
                         "chunk_id": chunk.chunk_id,
                         "text": chunk.content,
-                        "tags": [source_label, path.suffix.lower().lstrip(".")],
+                        "category": category,
+                        "tags": [source_label, category, path.suffix.lower().lstrip(".")],
                     },
                 )
             )
@@ -71,6 +91,7 @@ class RagService:
             "chunks_created": len(chunks),
             "points_written": len(points),
             "source_label": source_label,
+            "category": category,
         }
 
     def answer_question(self, question: str, top_k: int | None = None, tag_filter: str | None = None) -> dict:
@@ -134,6 +155,15 @@ class RagService:
         )
         return response.output_text
 
+    def _infer_category(self, root_directory: Path, path: Path) -> str:
+        try:
+            relative_parent = path.parent.relative_to(root_directory)
+        except ValueError:
+            return path.parent.name or "general"
+        if not relative_parent.parts:
+            return "general"
+        return relative_parent.parts[0]
+
 
 _rag_service: RagService | None = None
 
@@ -143,4 +173,3 @@ def get_rag_service() -> RagService:
     if _rag_service is None:
         _rag_service = RagService()
     return _rag_service
-
