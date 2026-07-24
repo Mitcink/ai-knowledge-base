@@ -65,13 +65,13 @@ def get_file_type_options(documents: list[dict]) -> list[str]:
     return sorted(file_types)
 
 
-st.title("AI Knowledge Base")
-st.caption("Search your notes, PDFs, and uploaded documents in one place.")
+st.title("AI 知识库")
+st.caption("在一个地方搜索你的笔记、PDF 和上传资料。")
 
 with st.sidebar:
-    st.subheader("Workspace")
+    st.subheader("工作台")
     st.code(API_BASE_URL)
-    if st.button("Check system status", use_container_width=True):
+    if st.button("检查系统状态", use_container_width=True):
         try:
             health = requests.get(f"{API_BASE_URL}/health", timeout=10)
             health.raise_for_status()
@@ -98,82 +98,87 @@ except requests.RequestException as exc:
 
 hero_left, hero_right = st.columns([2, 1])
 with hero_left:
-    st.subheader("Overview")
+    st.subheader("系统概览")
     if overview_error:
-        st.error(f"Failed to load overview: {overview_error}")
+        st.error(f"读取系统概览失败：{overview_error}")
     elif overview:
         st.write(
-            f"Indexed **{overview['indexed_documents']} / {overview['total_documents']}** documents "
-            f"with **{overview['total_chunks']}** chunks."
+            f"当前已索引 **{overview['indexed_documents']} / {overview['total_documents']}** 份文档，"
+            f"共 **{overview['total_chunks']}** 个片段。"
         )
         if not overview["openai_configured"]:
-            st.warning("`OPENAI_API_KEY` is not configured.")
+            st.warning("尚未配置 `OPENAI_API_KEY`。")
         if not overview["qdrant_reachable"]:
-            st.warning("Qdrant is not reachable.")
+            st.warning("Qdrant 当前不可达。")
 with hero_right:
     if overview and not overview_error:
-        st.metric("Documents", overview["total_documents"])
-        st.metric("Indexed", overview["indexed_documents"])
-        st.metric("Chunks", overview["total_chunks"])
+        st.metric("文档数", overview["total_documents"])
+        st.metric("已索引", overview["indexed_documents"])
+        st.metric("片段数", overview["total_chunks"])
 
 
 if documents_error:
-    st.error(f"Failed to load documents: {documents_error}")
+    st.error(f"读取文档列表失败：{documents_error}")
 
 
-tab_search, tab_ingest, tab_manage = st.tabs(["Ask", "Sync & Upload", "Manage"])
+tab_search, tab_ingest, tab_manage = st.tabs(["智能问答", "同步与上传", "文档管理"])
 
 with tab_search:
-    st.subheader("Ask the knowledge base")
+    st.subheader("基于知识库提问")
+    st.caption("说明：当前可稳定过滤的维度是分类、来源和文件类型。之前的自由标签过滤设计不准确，已经移除。")
 
-    category_options = ["All"] + sorted({doc["category"] for doc in documents})
-    source_options = ["All"] + sorted({doc["source_label"] for doc in documents})
-    file_type_options = ["All"] + get_file_type_options(documents)
+    category_options = ["全部"] + sorted({doc["category"] for doc in documents})
+    source_options = ["全部"] + sorted({doc["source_label"] for doc in documents})
+    file_type_options = ["全部"] + get_file_type_options(documents)
 
     with st.form("search_form"):
         question = st.text_area(
-            "Question",
-            placeholder="Example: Summarize my notes about RAG chunking strategies.",
+            "你的问题",
+            placeholder="例如：总结我关于 RAG 分块策略的笔记。",
             height=140,
         )
         filter_col1, filter_col2, filter_col3 = st.columns(3)
         with filter_col1:
-            selected_category = st.selectbox("Category", category_options)
+            selected_category = st.selectbox("分类过滤", category_options)
         with filter_col2:
-            selected_source = st.selectbox("Source", source_options)
+            selected_source = st.selectbox("来源过滤", source_options)
         with filter_col3:
-            selected_file_type = st.selectbox("File type", file_type_options)
-        top_k = st.select_slider("Recall size", options=TOP_K_OPTIONS, value=int(st.session_state["top_k"]))
-        submitted = st.form_submit_button("Ask", type="primary", use_container_width=True)
+            selected_file_type = st.selectbox("文件类型过滤", file_type_options)
+        top_k = st.select_slider("召回数量", options=TOP_K_OPTIONS, value=int(st.session_state["top_k"]))
+        submitted = st.form_submit_button("开始问答", type="primary", use_container_width=True)
 
     if submitted:
         if not question.strip():
-            st.warning("Enter a question first.")
+            st.warning("请先输入问题。")
         else:
             st.session_state["top_k"] = int(top_k)
             payload = {
                 "question": question.strip(),
                 "top_k": int(top_k),
-                "category_filter": None if selected_category == "All" else selected_category,
-                "source_filter": None if selected_source == "All" else selected_source,
-                "file_type_filter": None if selected_file_type == "All" else selected_file_type,
+                "category_filter": None if selected_category == "全部" else selected_category,
+                "source_filter": None if selected_source == "全部" else selected_source,
+                "file_type_filter": None if selected_file_type == "全部" else selected_file_type,
                 "tag_filter": None,
             }
             try:
-                with st.spinner("Searching and generating answer..."):
+                with st.spinner("正在检索并生成回答..."):
                     response = requests.post(f"{API_BASE_URL}/api/query", json=payload, timeout=60)
                     response.raise_for_status()
                     result = response.json()
-                st.session_state["query_history"] = [question.strip(), *st.session_state["query_history"][:4]]
-                st.subheader("Answer")
-                st.write(result["answer"])
 
-                debug = result.get("debug", {})
+                if not isinstance(result, dict):
+                    raise ValueError(f"API 返回了非预期结果：{type(result)}")
+
+                st.session_state["query_history"] = [question.strip(), *st.session_state["query_history"][:4]]
+                st.subheader("回答")
+                st.write(result.get("answer", "没有返回回答内容。"))
+
+                debug = result.get("debug", {}) if isinstance(result.get("debug", {}), dict) else {}
                 metric_col1, metric_col2, metric_col3 = st.columns(3)
-                metric_col1.metric("Candidates", debug.get("retrieved_candidates", 0))
-                metric_col2.metric("Citations", debug.get("returned_citations", 0))
+                metric_col1.metric("召回候选", debug.get("retrieved_candidates", 0))
+                metric_col2.metric("返回引用", debug.get("returned_citations", 0))
                 active_filters = ", ".join(
-                    value
+                    str(value)
                     for value in [
                         debug.get("category_filter"),
                         debug.get("source_filter"),
@@ -181,49 +186,53 @@ with tab_search:
                     ]
                     if value
                 )
-                metric_col3.metric("Filters", active_filters or "None")
+                metric_col3.metric("当前过滤", active_filters or "无")
 
-                st.subheader("Citations")
-                for citation in result["citations"]:
-                    with st.expander(f"{citation['title']} | {citation['chunk_id']} | score {citation['score']}"):
+                st.subheader("引用片段")
+                for citation in result.get("citations", []):
+                    with st.expander(f"{citation.get('title', '未知标题')} | {citation.get('chunk_id', '-')} | 分数 {citation.get('score', '-') }"):
                         st.caption(citation["file_path"])
                         st.write(citation["excerpt"])
             except requests.RequestException as exc:
-                st.error(f"Query failed: {exc}")
+                st.error(f"问答请求失败：{exc}")
+            except Exception as exc:
+                st.error(f"问答执行异常：{exc}")
+                st.code(repr(payload), language="python")
+                st.exception(exc)
 
     if st.session_state["query_history"]:
-        st.caption("Recent questions: " + " | ".join(st.session_state["query_history"]))
+        st.caption("最近问题：" + " | ".join(st.session_state["query_history"]))
 
 with tab_ingest:
-    st.subheader("Sync and upload")
+    st.subheader("同步与上传")
 
     sync_col, upload_col = st.columns(2)
     with sync_col:
-        st.markdown("### Sync `data/raw/`")
-        if st.button("Sync raw directory", type="primary", use_container_width=True):
+        st.markdown("### 同步 `data/raw/`")
+        if st.button("同步原始目录", type="primary", use_container_width=True):
             try:
-                with st.spinner("Syncing raw directory..."):
+                with st.spinner("正在同步原始目录..."):
                     response = requests.post(f"{API_BASE_URL}/api/documents/ingest/raw", timeout=120)
                     response.raise_for_status()
                     result = response.json()
                 mark_documents_stale()
-                st.success(f"Synced {result['ingested_count']} files.")
+                st.success(f"本次已同步 {result['ingested_count']} 个文件。")
                 if result["summaries"]:
                     st.dataframe(result["summaries"], use_container_width=True)
             except requests.RequestException as exc:
-                st.error(f"Sync failed: {exc}")
+                st.error(f"同步失败：{exc}")
 
     with upload_col:
-        st.markdown("### Upload a file")
+        st.markdown("### 上传单个文件")
         with st.form("upload_form", clear_on_submit=True):
-            uploaded_file = st.file_uploader("Select a document", type=["md", "markdown", "txt", "pdf"])
-            source_label = st.text_input("Source label", value="upload")
-            category = st.text_input("Category", value="general")
-            upload_submitted = st.form_submit_button("Upload and index", use_container_width=True)
+            uploaded_file = st.file_uploader("选择文档", type=["md", "markdown", "txt", "pdf"])
+            source_label = st.text_input("来源标签", value="upload")
+            category = st.text_input("文档分类", value="general")
+            upload_submitted = st.form_submit_button("上传并索引", use_container_width=True)
 
         if upload_submitted:
             if uploaded_file is None:
-                st.warning("Choose a file first.")
+                st.warning("请先选择文件。")
             else:
                 try:
                     files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type or "application/octet-stream")}
@@ -231,88 +240,88 @@ with tab_ingest:
                     response = requests.post(f"{API_BASE_URL}/api/documents/upload", files=files, data=data, timeout=120)
                     response.raise_for_status()
                     mark_documents_stale()
-                    st.success("File indexed successfully.")
+                    st.success("文档入库成功。")
                     st.json(response.json())
                 except requests.RequestException as exc:
-                    st.error(f"Upload failed: {exc}")
+                    st.error(f"上传失败：{exc}")
 
 with tab_manage:
-    st.subheader("Manage documents")
+    st.subheader("文档管理")
 
     refresh_col, summary_col = st.columns([1, 3])
     with refresh_col:
-        refresh_clicked = st.button("Refresh", use_container_width=True)
+        refresh_clicked = st.button("刷新", use_container_width=True)
     with summary_col:
-        st.caption("Refresh after sync, upload, or delete.")
+        st.caption("同步、上传或删除后可以刷新列表。")
 
     if refresh_clicked:
         try:
             documents = fetch_documents(force_refresh=True)
         except requests.RequestException as exc:
-            st.error(f"Refresh failed: {exc}")
+            st.error(f"刷新失败：{exc}")
             documents = []
 
     if not documents:
-        st.info("No documents available yet.")
+        st.info("当前还没有文档。")
     else:
         indexed_count = sum(1 for doc in documents if doc["indexed"])
         orphaned_count = sum(1 for doc in documents if doc["indexed"] and not doc["exists_on_disk"])
         stat_col1, stat_col2, stat_col3 = st.columns(3)
-        stat_col1.metric("Documents", len(documents))
-        stat_col2.metric("Indexed", indexed_count)
-        stat_col3.metric("Orphaned indexes", orphaned_count)
+        stat_col1.metric("文档数", len(documents))
+        stat_col2.metric("已索引", indexed_count)
+        stat_col3.metric("孤立索引", orphaned_count)
 
         categories = Counter(doc["category"] for doc in documents)
-        st.caption("Categories: " + " | ".join(f"{name}: {count}" for name, count in categories.most_common()))
+        st.caption("分类分布：" + " | ".join(f"{name}: {count}" for name, count in categories.most_common()))
 
         filter_col1, filter_col2, filter_col3 = st.columns(3)
         with filter_col1:
-            selected_category = st.selectbox("Category filter", ["All"] + sorted(categories))
+            selected_category = st.selectbox("分类过滤", ["全部"] + sorted(categories))
         with filter_col2:
-            selected_storage = st.selectbox("Storage area", ["All"] + sorted({doc["storage_area"] for doc in documents}))
+            selected_storage = st.selectbox("存储区域", ["全部"] + sorted({doc["storage_area"] for doc in documents}))
         with filter_col3:
-            selected_index_status = st.selectbox("Index status", ["All", "Indexed only", "Unindexed only"])
+            selected_index_status = st.selectbox("索引状态", ["全部", "仅已索引", "仅未索引"])
 
         filtered_documents = []
         for doc in documents:
-            if selected_category != "All" and doc["category"] != selected_category:
+            if selected_category != "全部" and doc["category"] != selected_category:
                 continue
-            if selected_storage != "All" and doc["storage_area"] != selected_storage:
+            if selected_storage != "全部" and doc["storage_area"] != selected_storage:
                 continue
-            if selected_index_status == "Indexed only" and not doc["indexed"]:
+            if selected_index_status == "仅已索引" and not doc["indexed"]:
                 continue
-            if selected_index_status == "Unindexed only" and doc["indexed"]:
+            if selected_index_status == "仅未索引" and doc["indexed"]:
                 continue
             filtered_documents.append(doc)
 
         table_rows = [
             {
-                "Filename": doc["filename"],
-                "Category": doc["category"],
-                "Source": doc["source_label"],
-                "Area": doc["storage_area"],
-                "Size": format_file_size(doc["size_bytes"]),
-                "Chunks": doc["chunk_count"],
-                "Indexed": "Yes" if doc["indexed"] else "No",
-                "On disk": "Yes" if doc["exists_on_disk"] else "No",
-                "Relative path": doc["relative_path"],
+                "文件名": doc["filename"],
+                "分类": doc["category"],
+                "来源": doc["source_label"],
+                "区域": doc["storage_area"],
+                "大小": format_file_size(doc["size_bytes"]),
+                "片段数": doc["chunk_count"],
+                "已索引": "是" if doc["indexed"] else "否",
+                "磁盘存在": "是" if doc["exists_on_disk"] else "否",
+                "相对路径": doc["relative_path"],
             }
             for doc in filtered_documents
         ]
         st.dataframe(table_rows, use_container_width=True, hide_index=True)
 
         doc_options = {
-            f"{doc['filename']} | {doc['category']} | {doc['storage_area']} | indexed:{'yes' if doc['indexed'] else 'no'}": doc
+            f"{doc['filename']} | {doc['category']} | {doc['storage_area']} | 已索引:{'是' if doc['indexed'] else '否'}": doc
             for doc in filtered_documents
             if doc["storage_area"] in {"raw", "upload"}
         }
 
         if doc_options:
             with st.form("delete_form"):
-                selected_label = st.selectbox("Document to delete", list(doc_options.keys()))
-                delete_file = st.checkbox("Delete source file", value=True)
-                delete_index = st.checkbox("Delete vector index", value=True)
-                delete_submitted = st.form_submit_button("Delete selected document", use_container_width=True)
+                selected_label = st.selectbox("选择要删除的文档", list(doc_options.keys()))
+                delete_file = st.checkbox("删除原文件", value=True)
+                delete_index = st.checkbox("删除向量索引", value=True)
+                delete_submitted = st.form_submit_button("删除选中文档", use_container_width=True)
 
             if delete_submitted:
                 try:
@@ -326,7 +335,7 @@ with tab_manage:
                     response = requests.post(f"{API_BASE_URL}/api/documents/delete", json=payload, timeout=60)
                     response.raise_for_status()
                     mark_documents_stale()
-                    st.success("Delete completed.")
+                    st.success("删除完成。")
                     st.json(response.json())
                 except requests.RequestException as exc:
-                    st.error(f"Delete failed: {exc}")
+                    st.error(f"删除失败：{exc}")
