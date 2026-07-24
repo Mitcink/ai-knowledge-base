@@ -104,11 +104,34 @@ class RagService:
             source_label=source_label or self._settings.auto_ingest_source_label,
         )
 
-    def answer_question(self, question: str, top_k: int | None = None, tag_filter: str | None = None) -> dict:
+    def answer_question(
+        self,
+        question: str,
+        top_k: int | None = None,
+        category_filter: str | None = None,
+        tag_filter: str | None = None,
+    ) -> dict:
         top_k = top_k or self._settings.top_k
         query_vector = self._embedding_client.embed_query(question)
-        candidates = self._vector_store.search(query_vector=query_vector, limit=max(top_k * 3, top_k), tag_filter=tag_filter)
+        candidates = self._vector_store.search(
+            query_vector=query_vector,
+            limit=max(top_k * 3, top_k),
+            category_filter=category_filter,
+            tag_filter=tag_filter,
+        )
         ranked = self._rerank(question, candidates)[:top_k]
+
+        if not ranked:
+            return {
+                "answer": "没有找到符合当前筛选条件的相关内容。你可以放宽分类或标签过滤后再试一次。",
+                "citations": [],
+                "debug": {
+                    "retrieved_candidates": 0,
+                    "returned_citations": 0,
+                    "category_filter": category_filter,
+                    "tag_filter": tag_filter,
+                },
+            }
 
         context_blocks = []
         citations = []
@@ -135,6 +158,7 @@ class RagService:
             "debug": {
                 "retrieved_candidates": len(candidates),
                 "returned_citations": len(citations),
+                "category_filter": category_filter,
                 "tag_filter": tag_filter,
             },
         }

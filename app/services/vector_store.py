@@ -39,17 +39,33 @@ class VectorStore:
     def upsert(self, points: list[models.PointStruct]) -> None:
         self._client.upsert(collection_name=self._collection, points=points)
 
-    def search(self, query_vector: list[float], limit: int, tag_filter: str | None) -> list[dict[str, Any]]:
-        query_filter = None
-        if tag_filter:
-            query_filter = models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="tags",
-                        match=models.MatchValue(value=tag_filter),
-                    )
-                ]
+    def search(
+        self,
+        query_vector: list[float],
+        limit: int,
+        category_filter: str | None = None,
+        tag_filter: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if not self.collection_exists():
+            return []
+
+        must_conditions: list[models.FieldCondition] = []
+        if category_filter:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="category",
+                    match=models.MatchValue(value=category_filter),
+                )
             )
+        if tag_filter:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="tags",
+                    match=models.MatchValue(value=tag_filter),
+                )
+            )
+
+        query_filter = models.Filter(must=must_conditions) if must_conditions else None
 
         results = self._client.search(
             collection_name=self._collection,

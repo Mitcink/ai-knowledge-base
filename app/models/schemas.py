@@ -71,6 +71,7 @@ class DocumentDeleteResponse(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     top_k: int = 6
+    category_filter: str | None = None
     tag_filter: str | None = None
 
 

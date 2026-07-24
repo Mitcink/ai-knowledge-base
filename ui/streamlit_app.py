@@ -152,7 +152,8 @@ with tab_search:
             payload = {
                 "question": question.strip(),
                 "top_k": int(top_k),
-                "tag_filter": None if selected_category == "不限" else selected_category,
+                "category_filter": None if selected_category == "不限" else selected_category,
+                "tag_filter": None,
             }
             if tag_filter.strip():
                 payload["tag_filter"] = tag_filter.strip()
@@ -172,7 +173,8 @@ with tab_search:
                 metric_col1, metric_col2, metric_col3 = st.columns(3)
                 metric_col1.metric("召回候选", debug.get("retrieved_candidates", 0))
                 metric_col2.metric("返回引用", debug.get("returned_citations", 0))
-                metric_col3.metric("过滤标签", debug.get("tag_filter") or "无")
+                active_filter = debug.get("category_filter") or debug.get("tag_filter") or "无"
+                metric_col3.metric("当前过滤", active_filter)
 
                 st.subheader("引用片段")
                 for citation in result["citations"]:
