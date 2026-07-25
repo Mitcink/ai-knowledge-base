@@ -10,38 +10,33 @@
     <div class="app-shell">
       <header class="app-header">
         <div class="brand">
-          <span class="brand-mark">AI</span>
+          <span class="brand-mark">KB</span>
           <div>
             <strong>AI Knowledge Base</strong>
-            <span>知识库工作台</span>
+            <span>个人知识库工作台</span>
           </div>
         </div>
+        <div class="header-status" aria-live="polite">
+          <span id="systemStatus" class="status-pill">检查中</span>
+          <span id="systemDetail" class="header-detail">正在检查 API 与向量库配置。</span>
+        </div>
         <div class="header-actions">
-          <span id="systemStatus" class="status-pill">加载中</span>
           <button id="refreshAllBtn" class="button subtle" type="button">重新检查</button>
         </div>
       </header>
 
       <div class="workspace">
-        <div class="workspace-intro">
-          <div>
-            <p class="eyebrow">RAG Workspace</p>
-            <h1>知识库工作台</h1>
-            <p>检索已整理的资料，核对回答依据，并管理文档索引状态。</p>
-          </div>
-        </div>
-
         <section class="overview-grid" aria-label="系统概览">
           <article class="metric-card metric-status">
-            <span>连接状态</span>
-            <strong id="systemDetail">正在检查 API 与向量库。</strong>
+            <span>系统就绪度</span>
+            <strong>连接状态和配置问题会显示在顶部状态栏</strong>
           </article>
           <article class="metric-card">
             <span>文档总数</span>
             <strong id="totalDocuments">-</strong>
           </article>
           <article class="metric-card">
-            <span>已索引</span>
+            <span>已索引文档</span>
             <strong id="indexedDocuments">-</strong>
           </article>
           <article class="metric-card">
@@ -51,52 +46,62 @@
         </section>
 
         <nav class="tabs" aria-label="工作台模块">
-          <button class="tab active" type="button" data-tab="search">问答工作台</button>
-          <button class="tab" type="button" data-tab="ingest">导入与同步</button>
+          <button class="tab active" type="button" data-tab="search">问答检索</button>
+          <button class="tab" type="button" data-tab="ingest">导入同步</button>
           <button class="tab" type="button" data-tab="manage">文档治理</button>
         </nav>
 
         <main>
           <section id="tab-search" class="panel active">
-            <div class="panel-head">
+            <div class="panel-head compact">
               <div>
-                <h2>问答工作台</h2>
-                <p>输入问题并限定检索范围，回答和引用会在固定高度的文本区内独立滚动。</p>
+                <h1>问答检索</h1>
+                <p>先限定检索范围，再生成回答。回答和引用片段分栏展示，均为固定高度阅读区，引用内容不会撑长页面。</p>
               </div>
             </div>
 
-            <section class="query-panel">
+            <section class="query-panel" aria-label="检索条件">
               <form id="queryForm" class="query-form">
                 <label class="field question-field">
                   <span>问题</span>
                   <textarea id="questionInput" placeholder="例如：Agent 的最小架构包含哪些部分？"></textarea>
                 </label>
 
-                <div class="filters-grid">
-                  <label class="field">
-                    <span>分类</span>
-                    <select id="categoryFilter"></select>
-                  </label>
-                  <label class="field">
-                    <span>来源</span>
-                    <select id="sourceFilter"></select>
-                  </label>
-                  <label class="field">
-                    <span>文件类型</span>
-                    <select id="fileTypeFilter"></select>
-                  </label>
-                  <label class="field">
-                    <span>引用数量</span>
-                    <select id="topK">
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                      <option value="5">5</option>
-                      <option value="6" selected>6</option>
-                      <option value="8">8</option>
-                      <option value="10">10</option>
-                      <option value="12">12</option>
-                    </select>
-                  </label>
+                <div class="filters-column">
+                  <div class="filter-note">
+                    <strong>检索过滤说明</strong>
+                    <p>空选项表示不过滤该条件；没有可用选项表示当前库里没有对应元数据，不能用于筛选。</p>
+                  </div>
+                  <div class="filters-grid">
+                    <label class="field">
+                      <span>分类过滤</span>
+                      <select id="categoryFilter"></select>
+                      <small>只检索所选分类；空选项为全部分类。</small>
+                    </label>
+                    <label class="field">
+                      <span>来源过滤</span>
+                      <select id="sourceFilter"></select>
+                      <small>只检索所选来源标签；空选项为全部来源。</small>
+                    </label>
+                    <label class="field">
+                      <span>文件类型过滤</span>
+                      <select id="fileTypeFilter"></select>
+                      <small>只检索所选文件类型；空选项为全部类型。</small>
+                    </label>
+                    <label class="field">
+                      <span>返回引用数</span>
+                      <select id="topK">
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6" selected>6</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                        <option value="12">12</option>
+                      </select>
+                      <small>控制后端返回的候选片段数量。</small>
+                    </label>
+                  </div>
                 </div>
 
                 <div class="query-actions">
@@ -110,7 +115,7 @@
             <section class="result-grid" aria-label="问答结果">
               <article class="result-panel">
                 <div class="section-title">
-                  <h3>回答</h3>
+                  <h2>回答</h2>
                   <span>Answer</span>
                 </div>
                 <div id="answerBox" class="result-textbox empty">还没有回答，请先输入问题。</div>
@@ -118,7 +123,7 @@
 
               <article class="result-panel">
                 <div class="section-title">
-                  <h3>引用片段</h3>
+                  <h2>引用片段</h2>
                   <span>Citations</span>
                 </div>
                 <div id="citationsBox" class="result-textbox citations-textbox empty">回答完成后，引用片段会显示在这里。</div>
@@ -129,8 +134,8 @@
           <section id="tab-ingest" class="panel">
             <div class="panel-head">
               <div>
-                <h2>导入与同步</h2>
-                <p>长期资料放入 <code>data/raw/</code> 后批量同步，临时资料可以单独上传。</p>
+                <h1>导入同步</h1>
+                <p>长期资料放入 <code>data/raw/</code> 后批量同步；临时资料可以单独上传并立即索引。</p>
               </div>
             </div>
 
@@ -139,11 +144,11 @@
                 <div class="flow-heading">
                   <div>
                     <span class="step-label">01</span>
-                    <h3>同步原始目录</h3>
+                    <h2>同步原始目录</h2>
                   </div>
                   <span class="flow-hint">适合长期维护的资料</span>
                 </div>
-                <p>扫描 <code>data/raw/</code> 下的支持格式文件，并更新对应的向量索引。</p>
+                <p>扫描 <code>data/raw/</code> 下的支持格式文件，并更新对应向量索引。</p>
                 <div class="action-line">
                   <button id="syncBtn" class="button primary" type="button">同步目录</button>
                   <span id="syncStatus" class="status-text"></span>
@@ -156,7 +161,7 @@
                   <div class="flow-heading">
                     <div>
                       <span class="step-label">02</span>
-                      <h3>上传单个文档</h3>
+                      <h2>上传单个文档</h2>
                     </div>
                     <span class="flow-hint">适合临时补充资料</span>
                   </div>
@@ -187,36 +192,44 @@
           <section id="tab-manage" class="panel">
             <div class="panel-head">
               <div>
-                <h2>文档治理</h2>
-                <p>搜索文件并按已有的分类、来源和索引状态筛选。没有数据时，筛选器会明确显示不可用原因。</p>
+                <h1>文档治理</h1>
+                <p>核对磁盘文件和向量索引是否一致。删除操作会影响可检索范围，请先确认状态含义。</p>
               </div>
             </div>
+
+            <section class="governance-guide" aria-label="筛选说明">
+              <strong>筛选规则</strong>
+              <p>搜索框匹配文件名或路径。分类、来源、索引状态只展示当前文档库里实际存在的值；空选项表示不过滤，不代表一个真实分类。</p>
+            </section>
 
             <section class="manage-toolbar">
               <label class="field search-field">
                 <span>搜索文件</span>
-                <input id="docSearchInput" type="search" placeholder="输入文件名或路径关键词" />
+                <input id="docSearchInput" type="search" placeholder="输入文件名或路径关键字" />
               </label>
               <label class="field">
-                <span>按已有分类</span>
+                <span>分类</span>
                 <select id="manageCategoryFilter"></select>
+                <small>空选项：全部分类</small>
               </label>
               <label class="field">
-                <span>按已有来源</span>
+                <span>来源</span>
                 <select id="manageSourceFilter"></select>
+                <small>空选项：全部来源</small>
               </label>
               <label class="field">
-                <span>按索引状态</span>
+                <span>索引状态</span>
                 <select id="manageStatusFilter"></select>
+                <small>空选项：全部状态</small>
               </label>
               <button id="resetDocFiltersBtn" class="button secondary reset-button" type="button">重置筛选</button>
             </section>
 
             <section class="status-legend" aria-label="文档状态说明">
-              <span><b class="dot dot-success"></b>文件和索引：可被问答检索</span>
-              <span><b class="dot dot-warning"></b>仅文件：需要同步后才能检索</span>
-              <span><b class="dot dot-danger"></b>仅索引：文件缺失但旧片段仍可能被检索</span>
-              <span><b class="dot dot-danger"></b>外部索引：不属于 raw/upload 管理范围</span>
+              <span><b class="dot dot-success"></b>文件和索引都在：可被问答检索</span>
+              <span><b class="dot dot-warning"></b>仅磁盘存在：需要同步后才能检索</span>
+              <span><b class="dot dot-danger"></b>仅索引存在：原文件缺失，旧片段仍可能被检索</span>
+              <span><b class="dot dot-neutral"></b>外部索引：不属于 raw/upload 管理范围</span>
             </section>
 
             <section class="table-card">
@@ -228,7 +241,7 @@
                 <table>
                   <thead>
                     <tr>
-                      <th>文件</th>
+                      <th>文档</th>
                       <th>状态</th>
                       <th>分类</th>
                       <th>来源</th>

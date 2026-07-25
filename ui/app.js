@@ -1,6 +1,11 @@
 const state = {
   documents: [],
   filterOptions: null,
+  isRefreshing: false,
+  isLoadingDocuments: false,
+  isQuerying: false,
+  isSyncing: false,
+  isUploading: false,
 };
 
 const API_BASE_URL = resolveApiBaseUrl();
@@ -51,6 +56,12 @@ const elements = {
   uploadSource: document.getElementById("uploadSource"),
   uploadCategory: document.getElementById("uploadCategory"),
   docSearchInput: document.getElementById("docSearchInput"),
+  refreshAllBtn: document.getElementById("refreshAllBtn"),
+  refreshDocsBtn: document.getElementById("refreshDocsBtn"),
+  askBtn: document.getElementById("askBtn"),
+  clearQueryBtn: document.getElementById("clearQueryBtn"),
+  syncBtn: document.getElementById("syncBtn"),
+  uploadBtn: document.getElementById("uploadBtn"),
 };
 
 async function apiRequest(path, options = {}) {
@@ -63,15 +74,18 @@ async function apiRequest(path, options = {}) {
     if (error.name === "AbortError") {
       throw new Error("API 请求超时，请确认后端服务已启动。");
     }
+    if (error instanceof TypeError) {
+      throw new Error("无法连接后端 API，请确认 FastAPI 服务正在 8000 端口运行。");
+    }
     throw error;
   } finally {
     window.clearTimeout(timeout);
   }
   const contentType = response.headers.get("content-type") || "";
-  const body = contentType.includes("application/json") ? await response.json() : await response.text();
+  const body = contentType.includes("application/json") ? await response.json().catch(() => null) : await response.text();
 
   if (!response.ok) {
-    const detail = typeof body === "string" ? body : body.detail || JSON.stringify(body);
+    const detail = getErrorMessage(body) || response.statusText || "请求失败";
     throw new Error(`${response.status} ${detail}`);
   }
 
@@ -97,14 +111,24 @@ function setupTabs() {
   });
 }
 
-function fillSelect(select, items, placeholder = "全部") {
+function initializeFilterPlaceholders() {
+  fillSelect(elements.categoryFilter, [], "全部分类", "筛选项加载中");
+  fillSelect(elements.sourceFilter, [], "全部来源", "筛选项加载中");
+  fillSelect(elements.fileTypeFilter, [], "全部类型", "筛选项加载中");
+  fillSelect(elements.manageCategoryFilter, [], "全部分类", "筛选项加载中");
+  fillSelect(elements.manageSourceFilter, [], "全部来源", "筛选项加载中");
+  fillSelect(elements.manageStatusFilter, [], "全部状态", "筛选项加载中");
+}
+
+function fillSelect(select, items, placeholder = "全部", emptyLabel = "暂无可用选项") {
   const values = Array.isArray(items) ? items : [];
+  const previousValue = select.value;
   select.innerHTML = "";
-  select.disabled = false;
 
   const option = document.createElement("option");
   option.value = "";
-  option.textContent = values.length ? placeholder : "暂无可用选项";
+  option.textContent = values.length ? placeholder : emptyLabel;
+  option.disabled = values.length === 0;
   select.appendChild(option);
 
   values.forEach((item) => {
@@ -119,6 +143,17 @@ function fillSelect(select, items, placeholder = "全部") {
 
   select.disabled = values.length === 0;
   select.title = values.length ? "" : "当前没有可供筛选的数据";
+  select.value = values.includes(previousValue) ? previousValue : "";
+  select.setAttribute("aria-disabled", String(select.disabled));
+}
+
+function markFiltersFailed() {
+  fillSelect(elements.categoryFilter, [], "全部分类", "筛选项加载失败");
+  fillSelect(elements.sourceFilter, [], "全部来源", "筛选项加载失败");
+  fillSelect(elements.fileTypeFilter, [], "全部类型", "筛选项加载失败");
+  fillSelect(elements.manageCategoryFilter, [], "全部分类", "筛选项加载失败");
+  fillSelect(elements.manageSourceFilter, [], "全部来源", "筛选项加载失败");
+  fillSelect(elements.manageStatusFilter, [], "全部状态", "筛选项加载失败");
 }
 
 async function loadOverview() {
@@ -134,19 +169,29 @@ async function loadOverview() {
 }
 
 async function loadFilters() {
-  state.filterOptions = await apiRequest("/api/documents/filters");
-  fillSelect(elements.categoryFilter, state.filterOptions.categories);
-  fillSelect(elements.sourceFilter, state.filterOptions.source_labels);
-  fillSelect(elements.fileTypeFilter, state.filterOptions.file_types);
-  fillSelect(elements.manageCategoryFilter, state.filterOptions.categories);
-  fillSelect(elements.manageSourceFilter, state.filterOptions.source_labels);
-  fillSelect(elements.manageStatusFilter, state.filterOptions.statuses);
+  try {
+    state.filterOptions = await apiRequest("/api/documents/filters");
+    fillSelect(elements.categoryFilter, state.filterOptions.categories, "全部分类", "暂无可筛选分类");
+    fillSelect(elements.sourceFilter, state.filterOptions.source_labels, "全部来源", "暂无可筛选来源");
+    fillSelect(elements.fileTypeFilter, state.filterOptions.file_types, "全部类型", "暂无可筛选类型");
+    fillSelect(elements.manageCategoryFilter, state.filterOptions.categories, "全部分类", "暂无可治理分类");
+    fillSelect(elements.manageSourceFilter, state.filterOptions.source_labels, "全部来源", "暂无可治理来源");
+    fillSelect(elements.manageStatusFilter, state.filterOptions.statuses, "全部状态", "暂无可治理状态");
+  } catch (error) {
+    markFiltersFailed();
+    throw error;
+  }
 }
 
 async function loadDocuments() {
-  const result = await apiRequest("/api/documents");
-  state.documents = result.documents;
-  renderDocuments();
+  state.isLoadingDocuments = true;
+  try {
+    const result = await apiRequest("/api/documents");
+    state.documents = Array.isArray(result.documents) ? result.documents : [];
+    renderDocuments();
+  } finally {
+    state.isLoadingDocuments = false;
+  }
 }
 
 function renderDocuments() {
@@ -163,10 +208,21 @@ function renderDocuments() {
     return true;
   });
 
-  elements.documentsSummary.textContent = `显示 ${filtered.length} / ${state.documents.length} 份文档`;
+  const activeFilters = [
+    keyword && `关键词“${keyword}”`,
+    category && `分类“${category}”`,
+    source && `来源“${source}”`,
+    status && `状态“${statusLabels[status] || status}”`,
+  ].filter(Boolean);
+  elements.documentsSummary.textContent = `显示 ${filtered.length} / ${state.documents.length} 份文档${
+    activeFilters.length ? `，筛选：${activeFilters.join("、")}` : ""
+  }`;
 
   if (!filtered.length) {
-    elements.documentsTable.innerHTML = `<tr><td colspan="8" class="empty-row">没有符合条件的文档。可以清空筛选，或先导入资料。</td></tr>`;
+    const message = state.documents.length
+      ? "没有符合条件的文档。可以清空筛选或调整关键词。"
+      : "还没有可治理的文档。请先同步 data/raw 或上传文件。";
+    elements.documentsTable.innerHTML = `<tr><td colspan="8" class="empty-row">${escapeHtml(message)}</td></tr>`;
     return;
   }
 
@@ -200,30 +256,41 @@ function renderDocumentRow(doc) {
 }
 
 async function refreshWorkspace() {
-  const button = document.getElementById("refreshAllBtn");
-  button.disabled = true;
-  button.textContent = "检查中...";
+  if (state.isRefreshing) return;
+  state.isRefreshing = true;
+  setButtonBusy(elements.refreshAllBtn, true, "检查中...", "重新检查");
+  elements.systemStatus.textContent = "检查中";
+  elements.systemStatus.classList.remove("degraded");
+  elements.systemDetail.textContent = "正在刷新概览、筛选项和文档列表。";
   try {
-    await Promise.all([loadOverview(), loadFilters(), loadDocuments()]);
+    const results = await Promise.allSettled([loadOverview(), loadFilters(), loadDocuments()]);
+    const failures = results.filter((result) => result.status === "rejected");
+    if (failures.length) {
+      throw new Error(uniqueMessages(failures.map((failure) => failure.reason.message)).join("；"));
+    }
+    elements.systemDetail.textContent = `${elements.systemDetail.textContent} 已刷新：${new Date().toLocaleTimeString()}`;
   } catch (error) {
     elements.systemStatus.textContent = "检查失败";
     elements.systemStatus.classList.add("degraded");
-    elements.systemDetail.textContent = error.message;
+    elements.systemDetail.textContent = `刷新失败：${formatError(error)}`;
   } finally {
-    button.disabled = false;
-    button.textContent = "重新检查";
+    state.isRefreshing = false;
+    setButtonBusy(elements.refreshAllBtn, false, "检查中...", "重新检查");
   }
 }
 
 async function askQuestion(event) {
   event.preventDefault();
   const question = elements.questionInput.value.trim();
+  if (state.isQuerying) return;
   if (!question) {
     elements.queryStatus.textContent = "请输入问题。";
     elements.questionInput.focus();
     return;
   }
 
+  state.isQuerying = true;
+  setButtonBusy(elements.askBtn, true, "回答中...", "开始回答");
   elements.queryStatus.textContent = "正在生成回答...";
   setTextbox(elements.answerBox, "正在整理回答...", false);
   setTextbox(elements.citationsBox, "正在检索引用片段...", false);
@@ -243,13 +310,18 @@ async function askQuestion(event) {
     });
 
     const citations = result.citations || [];
-    elements.queryStatus.textContent = `回答完成，返回 ${citations.length} 条引用。`;
+    const debugSummary = formatDebugSummary(result.debug);
+    elements.queryStatus.textContent = `回答完成，返回 ${citations.length} 条引用${debugSummary ? `；${debugSummary}` : ""}。`;
     setTextbox(elements.answerBox, result.answer || "没有返回回答内容。", false);
-    renderCitations(citations);
+    renderCitations(citations, result.debug);
   } catch (error) {
-    elements.queryStatus.textContent = `请求失败：${error.message}`;
-    setTextbox(elements.answerBox, `请求失败：${error.message}`, false);
+    const message = formatError(error);
+    elements.queryStatus.textContent = `请求失败：${message}`;
+    setTextbox(elements.answerBox, `请求失败\n\n${message}`, false);
     setTextbox(elements.citationsBox, "本次没有可用引用片段。", true);
+  } finally {
+    state.isQuerying = false;
+    setButtonBusy(elements.askBtn, false, "回答中...", "开始回答");
   }
 }
 
@@ -258,26 +330,36 @@ function setTextbox(node, text, empty) {
   node.textContent = text;
 }
 
-function renderCitations(citations) {
+function renderCitations(citations, debug) {
   if (!citations.length) {
-    setTextbox(elements.citationsBox, "本次没有返回引用片段。", true);
+    const debugText = formatDebugBlock(debug);
+    setTextbox(elements.citationsBox, `本次没有返回引用片段。${debugText ? `\n\n${debugText}` : ""}`, true);
     return;
   }
 
   elements.citationsBox.classList.remove("empty");
-  elements.citationsBox.innerHTML = citations
+  const citationText = citations
     .map((citation, index) => {
-      const title = `${index + 1}. ${citation.filename || "未命名文件"} · ${citation.chunk_id || "片段"}`;
-      const meta = `${citation.file_path || citation.title || "未知路径"} · 相关度 ${Number(citation.score || 0).toFixed(3)}`;
-      return `<article class="citation-entry">
-        <div class="citation-entry-head"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(meta)}</span></div>
-        <pre>${escapeHtml(citation.excerpt || "无引用内容")}</pre>
-      </article>`;
+      const title = `${index + 1}. ${citation.filename || citation.title || "未命名文件"}`;
+      const meta = [
+        citation.chunk_id ? `片段：${citation.chunk_id}` : null,
+        citation.source ? `来源：${citation.source}` : null,
+        citation.file_path ? `路径：${citation.file_path}` : null,
+        Number.isFinite(Number(citation.score)) ? `相关度：${Number(citation.score).toFixed(3)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | ");
+      return `${title}\n${meta}\n${citation.excerpt || "无引用内容"}`;
     })
-    .join("");
+    .join("\n\n---\n\n");
+  const debugText = formatDebugBlock(debug);
+  elements.citationsBox.textContent = `${citationText}${debugText ? `\n\n---\n\n${debugText}` : ""}`;
 }
 
 async function syncRawDirectory() {
+  if (state.isSyncing) return;
+  state.isSyncing = true;
+  setButtonBusy(elements.syncBtn, true, "同步中...", "同步目录");
   elements.syncStatus.textContent = "同步中...";
   elements.syncResult.classList.add("hidden");
   try {
@@ -287,17 +369,23 @@ async function syncRawDirectory() {
     elements.syncResult.classList.remove("hidden");
     await refreshWorkspace();
   } catch (error) {
-    elements.syncStatus.textContent = `同步失败：${error.message}`;
+    elements.syncStatus.textContent = `同步失败：${formatError(error)}`;
+  } finally {
+    state.isSyncing = false;
+    setButtonBusy(elements.syncBtn, false, "同步中...", "同步目录");
   }
 }
 
 async function uploadSingleDocument(event) {
   event.preventDefault();
+  if (state.isUploading) return;
   if (!elements.uploadFile.files.length) {
     elements.uploadStatus.textContent = "请先选择要上传的文档。";
     return;
   }
 
+  state.isUploading = true;
+  setButtonBusy(elements.uploadBtn, true, "上传中...", "上传并索引");
   const formData = new FormData();
   formData.append("file", elements.uploadFile.files[0]);
   formData.append("source_label", elements.uploadSource.value.trim() || "upload");
@@ -310,7 +398,10 @@ async function uploadSingleDocument(event) {
     elements.uploadFile.value = "";
     await refreshWorkspace();
   } catch (error) {
-    elements.uploadStatus.textContent = `上传失败：${error.message}`;
+    elements.uploadStatus.textContent = `上传失败：${formatError(error)}`;
+  } finally {
+    state.isUploading = false;
+    setButtonBusy(elements.uploadBtn, false, "上传中...", "上传并索引");
   }
 }
 
@@ -329,7 +420,10 @@ async function handleTableAction(event) {
   const path = button.dataset.path;
   if (!window.confirm(`${options.label}：${path}\n\n${deleteWarnings[action]}\n\n确认继续？`)) return;
 
+  const originalText = button.textContent;
   try {
+    button.disabled = true;
+    button.textContent = "删除中";
     await apiRequest("/api/documents/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -342,7 +436,12 @@ async function handleTableAction(event) {
     });
     await refreshWorkspace();
   } catch (error) {
-    window.alert(`删除失败：${error.message}`);
+    const message = `删除失败：${formatError(error)}`;
+    elements.documentsSummary.textContent = message;
+    window.alert(message);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
   }
 }
 
@@ -356,16 +455,16 @@ function resetDocumentFilters() {
 
 function bindEvents() {
   setupTabs();
-  document.getElementById("refreshAllBtn").addEventListener("click", refreshWorkspace);
-  document.getElementById("refreshDocsBtn").addEventListener("click", loadDocuments);
-  document.getElementById("clearQueryBtn").addEventListener("click", () => {
+  elements.refreshAllBtn.addEventListener("click", refreshWorkspace);
+  elements.refreshDocsBtn.addEventListener("click", refreshDocumentsList);
+  elements.clearQueryBtn.addEventListener("click", () => {
     elements.questionInput.value = "";
     elements.queryStatus.textContent = "";
     setTextbox(elements.answerBox, "还没有回答，请先输入问题。", true);
     setTextbox(elements.citationsBox, "回答完成后，引用片段会显示在这里。", true);
     elements.questionInput.focus();
   });
-  document.getElementById("syncBtn").addEventListener("click", syncRawDirectory);
+  elements.syncBtn.addEventListener("click", syncRawDirectory);
   document.getElementById("queryForm").addEventListener("submit", askQuestion);
   document.getElementById("uploadForm").addEventListener("submit", uploadSingleDocument);
   document.getElementById("documentsTable").addEventListener("click", handleTableAction);
@@ -375,6 +474,62 @@ function bindEvents() {
     node.addEventListener("input", renderDocuments);
     node.addEventListener("change", renderDocuments);
   });
+}
+
+async function refreshDocumentsList() {
+  if (state.isLoadingDocuments) return;
+  setButtonBusy(elements.refreshDocsBtn, true, "刷新中...", "刷新列表");
+  elements.documentsSummary.textContent = "正在刷新文档列表。";
+  try {
+    const results = await Promise.allSettled([loadFilters(), loadDocuments()]);
+    const failures = results.filter((result) => result.status === "rejected");
+    if (failures.length) {
+      throw new Error(uniqueMessages(failures.map((failure) => failure.reason.message)).join("；"));
+    }
+    elements.documentsSummary.textContent = `文档列表已刷新：${new Date().toLocaleTimeString()}，共 ${state.documents.length} 份。`;
+  } catch (error) {
+    elements.documentsSummary.textContent = `刷新文档列表失败：${formatError(error)}`;
+  } finally {
+    state.isLoadingDocuments = false;
+    setButtonBusy(elements.refreshDocsBtn, false, "刷新中...", "刷新列表");
+  }
+}
+
+function setButtonBusy(button, busy, busyText, idleText) {
+  if (!button) return;
+  button.disabled = busy;
+  button.textContent = busy ? busyText : idleText;
+  button.setAttribute("aria-busy", String(busy));
+}
+
+function getErrorMessage(body) {
+  if (!body) return "";
+  if (typeof body === "string") return body;
+  if (typeof body.detail === "string") return body.detail;
+  if (Array.isArray(body.detail)) return body.detail.map((item) => item.msg || JSON.stringify(item)).join("；");
+  return JSON.stringify(body);
+}
+
+function formatError(error) {
+  return error?.message || "未知错误";
+}
+
+function formatDebugSummary(debug) {
+  if (!debug || typeof debug !== "object") return "";
+  const pairs = Object.entries(debug)
+    .filter(([, value]) => value !== null && value !== undefined && ["string", "number", "boolean"].includes(typeof value))
+    .slice(0, 3)
+    .map(([key, value]) => `${key}=${value}`);
+  return pairs.length ? `debug：${pairs.join("，")}` : "";
+}
+
+function formatDebugBlock(debug) {
+  if (!debug || typeof debug !== "object" || !Object.keys(debug).length) return "";
+  return `Debug\n${JSON.stringify(debug, null, 2)}`;
+}
+
+function uniqueMessages(messages) {
+  return [...new Set(messages.filter(Boolean))];
 }
 
 function escapeHtml(value) {
@@ -387,4 +542,5 @@ function escapeHtml(value) {
 }
 
 bindEvents();
+initializeFilterPlaceholders();
 refreshWorkspace();
