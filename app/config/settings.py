@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,18 @@ class Settings(BaseSettings):
     auto_ingest_source_label: str = "raw"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @model_validator(mode="after")
+    def validate_chunk_settings(self) -> "Settings":
+        if self.max_chunk_size <= 0:
+            raise ValueError("MAX_CHUNK_SIZE must be greater than 0")
+        if self.chunk_overlap < 0:
+            raise ValueError("CHUNK_OVERLAP must be 0 or greater")
+        if self.chunk_overlap >= self.max_chunk_size:
+            raise ValueError("CHUNK_OVERLAP must be smaller than MAX_CHUNK_SIZE")
+        if self.top_k <= 0:
+            raise ValueError("TOP_K must be greater than 0")
+        return self
 
 
 @lru_cache

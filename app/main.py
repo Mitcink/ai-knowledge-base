@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from app.api.routes.query import router as query_router
 from app.config.settings import get_settings
 from app.services.rag_service import get_rag_service
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -16,11 +19,14 @@ async def lifespan(_: FastAPI):
     if settings.auto_ingest_on_startup:
         raw_dir = Path(settings.raw_data_dir)
         raw_dir.mkdir(parents=True, exist_ok=True)
-        service = get_rag_service()
-        service.ingest_directory(
-            raw_dir,
-            source_label=settings.auto_ingest_source_label,
-        )
+        try:
+            service = get_rag_service()
+            service.ingest_directory(
+                raw_dir,
+                source_label=settings.auto_ingest_source_label,
+            )
+        except Exception:
+            logger.exception("Auto ingest on startup failed")
     yield
 
 

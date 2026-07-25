@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -34,13 +35,7 @@ class RagService:
         for path in sorted(directory.rglob("*")):
             if path.is_file() and is_supported_file(path):
                 category = default_category or self._infer_category(directory, path)
-                summaries.append(
-                    self.ingest_file(
-                        path,
-                        source_label=source_label,
-                        category=category,
-                    )
-                )
+                summaries.append(self.ingest_file(path, source_label=source_label, category=category))
         return summaries
 
     def ingest_file(
@@ -51,7 +46,8 @@ class RagService:
     ) -> dict:
         path = path.resolve()
         text = load_document_text(path)
-        category = category or path.parent.name or "general"
+        category = (category or path.parent.name or "general").strip() or "general"
+        file_type = path.suffix.lower().lstrip(".")
         chunks = split_text(
             text=text,
             chunk_size=self._settings.max_chunk_size,
@@ -60,15 +56,21 @@ class RagService:
         if not chunks:
             return {
                 "filename": path.name,
+                "file_type": file_type,
                 "chunks_created": 0,
                 "points_written": 0,
                 "source_label": source_label,
                 "category": category,
+                "message": "文档内容为空，未写入索引。",
             }
 
         vectors = self._embedding_client.embed_texts([chunk.content for chunk in chunks])
         self._vector_store.ensure_collection(vector_size=len(vectors[0]))
         self._vector_store.delete_by_file_path(str(path))
+
+        stat = path.stat()
+        ingested_at = datetime.now(timezone.utc).isoformat()
+        updated_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
 
         points: list[models.PointStruct] = []
         for chunk, vector in zip(chunks, vectors, strict=True):
@@ -78,22 +80,28 @@ class RagService:
                     vector=vector,
                     payload={
                         "title": path.stem,
+                        "filename": path.name,
                         "source": source_label,
                         "file_path": str(path),
+                        "file_type": file_type,
                         "chunk_id": chunk.chunk_id,
                         "text": chunk.content,
                         "category": category,
-                        "tags": [source_label, category, path.suffix.lower().lstrip(".")],
+                        "updated_at": updated_at,
+                        "ingested_at": ingested_at,
+                        "tags": [source_label, category, file_type],
                     },
                 )
             )
         self._vector_store.upsert(points)
         return {
             "filename": path.name,
+            "file_type": file_type,
             "chunks_created": len(chunks),
             "points_written": len(points),
             "source_label": source_label,
             "category": category,
+            "message": "文档已完成解析并写入索引。",
         }
 
     def ingest_raw_directory(self, source_label: str | None = None) -> list[dict]:
@@ -113,25 +121,31 @@ class RagService:
         file_type_filter: str | None = None,
         tag_filter: str | None = None,
     ) -> dict:
-        top_k = top_k or self._settings.top_k
-        query_vector = self._embedding_client.embed_query(question)
+        normalized_question = question.strip()
+        if not normalized_question:
+            raise ValueError("问题不能为空。")
+
+        top_k = max(1, min(top_k or self._settings.top_k, 12))
+        search_limit = max(top_k * 3, top_k)
+        query_vector = self._embedding_client.embed_query(normalized_question)
         candidates = self._vector_store.search(
             query_vector=query_vector,
-            limit=max(top_k * 3, top_k),
+            limit=search_limit,
             category_filter=category_filter,
             source_filter=source_filter,
             file_type_filter=file_type_filter,
             tag_filter=tag_filter,
         )
-        ranked = self._rerank(question, candidates)[:top_k]
+        ranked = self._rerank(normalized_question, candidates)[:top_k]
 
         if not ranked:
             return {
-                "answer": "没有找到符合当前筛选条件的相关内容。你可以放宽分类或标签过滤后再试一次。",
+                "answer": "没有找到符合当前筛选条件的相关内容。你可以放宽过滤条件，或者先导入更贴近问题的资料。",
                 "citations": [],
                 "debug": {
                     "retrieved_candidates": 0,
                     "returned_citations": 0,
+                    "search_limit": search_limit,
                     "category_filter": category_filter,
                     "source_filter": source_filter,
                     "file_type_filter": file_type_filter,
@@ -143,27 +157,27 @@ class RagService:
         citations = []
         for item in ranked:
             payload = item["payload"]
-            context_blocks.append(
-                f"[{payload['title']} | {payload['chunk_id']}]\n{payload['text']}"
-            )
+            context_blocks.append(f"[{payload['title']} | {payload['chunk_id']}]\n{payload['text']}")
             citations.append(
                 {
                     "title": payload["title"],
+                    "filename": payload.get("filename") or Path(payload["file_path"]).name,
                     "source": payload["source"],
                     "file_path": payload["file_path"],
                     "chunk_id": payload["chunk_id"],
                     "score": round(item["score"], 4),
-                    "excerpt": payload["text"][:240],
+                    "excerpt": payload["text"][:280],
                 }
             )
 
-        answer = self._generate_answer(question, context_blocks)
+        answer = self._generate_answer(normalized_question, context_blocks)
         return {
             "answer": answer,
             "citations": citations,
             "debug": {
                 "retrieved_candidates": len(candidates),
                 "returned_citations": len(citations),
+                "search_limit": search_limit,
                 "category_filter": category_filter,
                 "source_filter": source_filter,
                 "file_type_filter": file_type_filter,
@@ -183,18 +197,19 @@ class RagService:
         return ranked
 
     def _generate_answer(self, question: str, context_blocks: list[str]) -> str:
+        if not self._settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY 尚未配置，无法生成问答结果。")
+
         context = "\n\n".join(context_blocks) if context_blocks else "No relevant context found."
         prompt = (
-            "You are answering based only on the provided knowledge base context. "
-            "If the answer is uncertain, say what is missing. "
-            "Keep the answer concise and practical.\n\n"
+            "You are answering only from the provided knowledge base context.\n"
+            "Use the user's language.\n"
+            "Be concise, practical, and explicit about uncertainty.\n"
+            "If the context is insufficient, say what is missing instead of inventing facts.\n\n"
             f"Question:\n{question}\n\n"
             f"Context:\n{context}"
         )
-        response = self._llm_client.responses.create(
-            model=self._settings.llm_model,
-            input=prompt,
-        )
+        response = self._llm_client.responses.create(model=self._settings.llm_model, input=prompt)
         return response.output_text
 
     def _infer_category(self, root_directory: Path, path: Path) -> str:

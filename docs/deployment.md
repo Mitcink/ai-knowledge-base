@@ -46,7 +46,7 @@ EMBEDDING_MODEL=text-embedding-3-small
 QDRANT_URL=http://qdrant:6333
 ```
 
-如果你用的是兼容 OpenAI 协议的供应商，改 `OPENAI_BASE_URL` 和模型名即可。
+如果你用的是兼容 OpenAI 协议的供应商，主要修改 `OPENAI_BASE_URL` 和模型名即可。
 
 ## 4. 启动服务
 
@@ -64,7 +64,7 @@ docker compose logs -f ui
 
 ## 5. 首次导入资料
 
-把文档放进：
+先把资料放入：
 
 ```text
 data/raw/
@@ -76,15 +76,17 @@ data/raw/
 docker compose exec api python scripts/ingest.py
 ```
 
+如果你更希望走产品工作台，也可以直接打开 UI，在“导入与同步”页执行“同步原始目录”。
+
 ## 6. 对外访问
 
 默认端口：
 
-- `8000` API
-- `8501` Web UI
-- `6333` Qdrant
+- `8000`：API
+- `8501`：Web UI
+- `6333`：Qdrant
 
-如果直接开放到公网，不够安全。更推荐反向代理加 HTTPS。
+如果直接暴露到公网，安全性较弱。更推荐使用反向代理和 HTTPS。
 
 ## 7. Nginx 示例
 
@@ -117,12 +119,12 @@ server {
 
 ## 8. HTTPS
 
-推荐用：
+推荐方案：
 
 - `certbot`
-- 或者直接用 `Caddy`
+- 或直接使用 `Caddy`
 
-如果你希望部署更省心，后续可以把 Nginx 换成 Caddy。
+如果你希望维护更省心，后续可以把 Nginx 替换成 Caddy。
 
 ## 9. 持久化与备份
 
@@ -138,6 +140,6 @@ server {
 1. `docker compose ps` 全部正常
 2. `http://your-domain/` 能打开 UI
 3. `http://your-domain/health` 返回正常
-4. 成功导入至少 1 份文档
-5. 成功回答至少 3 个你能验证的问题
-
+4. 至少成功导入 1 份文档
+5. 至少成功回答 3 个你能验证的问题
+6. 文档总览里没有异常增长的孤立索引

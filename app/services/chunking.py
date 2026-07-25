@@ -10,7 +10,14 @@ class Chunk:
 
 
 def split_text(text: str, chunk_size: int, overlap: int) -> list[Chunk]:
-    normalized = " ".join(text.split())
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than 0")
+    if overlap < 0:
+        raise ValueError("overlap must be 0 or greater")
+    if overlap >= chunk_size:
+        raise ValueError("overlap must be smaller than chunk_size")
+
+    normalized = _normalize_text(text)
     if not normalized:
         return []
 
@@ -34,4 +41,10 @@ def split_text(text: str, chunk_size: int, overlap: int) -> list[Chunk]:
             break
         start = max(0, end - overlap)
     return chunks
+
+
+def _normalize_text(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines()]
+    paragraphs = [" ".join(line.split()) for line in lines if line.strip()]
+    return "\n".join(paragraphs).strip()
 

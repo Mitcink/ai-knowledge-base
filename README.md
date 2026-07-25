@@ -1,75 +1,59 @@
 # AI Knowledge Base
 
-一个适合个人长期维护的 AI 知识库项目，目标不是做一次性 demo，而是做成可以持续导入、持续检索、持续使用的资料工作台。
+一个面向个人长期维护的 AI 知识库项目。它不是一次性的 RAG demo，而是一个可持续导入、持续检索、持续清理和持续迭代的资料工作台。
 
-当前版本提供：
+当前版本聚焦三个目标：
 
-- 文档上传与批量同步
-- Markdown、TXT、PDF 入库
-- 基于 RAG 的问答与引用返回
-- 文档管理与索引状态查看
+- 把长期资料稳定导入知识库
+- 用可解释的引用结果验证问答质量
+- 把磁盘文件、向量索引和系统状态放在同一个工作台里管理
+
+## 核心能力
+
+- 批量同步 `data/raw/`，适合沉淀长期资料
+- 单文件上传并即时索引，适合补充零散内容
+- 基于 RAG 的问答与引用片段返回
+- 文档总览：区分已索引、待索引、孤立索引、外部索引
 - FastAPI + Streamlit 双端结构
-- Docker Compose 一键启动
+- Docker Compose 一键启动本地工作环境
 
-## 产品形态
+## 产品结构
 
-项目分成两层：
+- `app/`
+  - FastAPI API
+  - RAG 编排
+  - 文档解析与向量存储访问
+- `ui/`
+  - Streamlit 工作台
+  - 问答、导入、上传、文档管理和健康检查
+- `scripts/`
+  - 批量导入脚本
 
-- `app/`：FastAPI API、RAG 编排、文档解析、向量存储访问
-- `ui/`：Streamlit 工作台，负责问答、同步、上传和文档管理
+## 推荐使用流程
 
-知识库的推荐使用流程：
+1. 把长期资料放进 `data/raw/`
+2. 在工作台中执行“同步原始目录”
+3. 用“上传单个文件”补充临时资料
+4. 在“问答工作台”中验证召回质量与回答效果
+5. 在“文档总览”中清理旧文件、孤立索引或外部索引
 
-1. 把长期资料放到 `data/raw/`
-2. 用“一键同步原始目录”建立索引
-3. 用上传入口补充零散文件
-4. 通过问答页验证召回与回答质量
-5. 在文档管理页清理旧文件或孤立索引
-
-## 项目结构
+## 目录结构
 
 ```text
 ai-knowledge-base/
 ├─ app/                   # FastAPI API 与 RAG 服务
 ├─ ui/                    # Streamlit 工作台
 ├─ scripts/               # 批量导入脚本
+├─ docs/                  # 架构、部署与工作流文档
 ├─ data/
 │  ├─ raw/                # 长期维护的原始资料
 │  ├─ processed/          # 预留目录
 │  └─ uploads/            # Web 上传文件
-├─ docs/
 ├─ docker-compose.yml
 ├─ Dockerfile.api
 ├─ Dockerfile.ui
 └─ .env.example
 ```
-
-## 核心能力
-
-### 1. 智能问答
-
-- 输入问题后进行向量召回
-- 使用轻量关键词重排提升相关性
-- 返回回答时附带引用片段
-- 展示召回候选数与引用数，便于调试效果
-
-### 2. 同步与上传
-
-- 支持一键同步 `data/raw/`
-- 支持单文件上传后即时入库
-- 重复导入同一文件时会先清理旧索引，避免重复片段
-
-### 3. 文档管理
-
-- 查看文档总数、已索引数量、孤立索引
-- 按分类、存储区域、索引状态筛选
-- 删除原文件、删除索引，或两者同时删除
-
-### 4. 系统概览
-
-- 展示 OpenAI 配置是否完整
-- 展示 Qdrant 是否可达
-- 展示知识库文档数、索引数、片段数
 
 ## 本地启动
 
@@ -85,8 +69,9 @@ Copy-Item .env.example .env
 - `OPENAI_BASE_URL`
 - `LLM_MODEL`
 - `EMBEDDING_MODEL`
+- `QDRANT_URL`
 
-默认情况下，Docker 内的 Qdrant 地址已经配置为：
+默认 Docker Compose 环境中，Qdrant 地址已经配置为：
 
 ```env
 QDRANT_URL=http://qdrant:6333
@@ -104,11 +89,11 @@ docker compose up --build
 - API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 - Qdrant: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
 
-## 首次导入资料
+## 导入资料
 
-### 方案 A：放入原始目录后批量同步
+### 方案 A：批量同步 `data/raw/`
 
-把资料放到 `data/raw/`，然后在 UI 中点击“一键同步原始目录”。
+把资料放入 `data/raw/` 后，在 UI 中点击“同步原始目录”。
 
 也可以直接执行脚本：
 
@@ -118,7 +103,7 @@ docker compose exec api python scripts/ingest.py
 
 ### 方案 B：通过 Web 上传
 
-适合少量补充文档，上传后会立即写入索引。
+适合补充单篇文档，上传后会立即解析并写入索引。
 
 ## 支持的文件类型
 
@@ -127,35 +112,25 @@ docker compose exec api python scripts/ingest.py
 - `.txt`
 - `.pdf`
 
-文本文件优先按 `utf-8` 读取，也兼容常见中文编码回退。
+文本文件优先按 `utf-8` 读取，并兼容常见中文编码回退。
 
-## 环境变量
+## 系统管理能力
 
-`.env.example` 中已经包含默认值，常用项如下：
+当前工作台支持：
 
-```env
-OPENAI_API_KEY=your_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=gpt-4.1-mini
-EMBEDDING_MODEL=text-embedding-3-small
-QDRANT_URL=http://qdrant:6333
-QDRANT_COLLECTION=knowledge_base
-RAW_DATA_DIR=./data/raw
-UPLOAD_DIR=./data/uploads
-MAX_CHUNK_SIZE=800
-CHUNK_OVERLAP=120
-TOP_K=6
-AUTO_INGEST_ON_STARTUP=true
-AUTO_INGEST_SOURCE_LABEL=raw
-```
+- 查看 OpenAI 配置是否完整
+- 查看 Qdrant 是否可达
+- 查看文档总数、已索引数、待索引数、孤立索引数
+- 查看分类、来源、文件类型和存储区域分布
+- 按文件删除原文、删除索引或同时删除两者
 
-## 下一步可继续增强的方向
+## 下一步适合增强的方向
 
-- 增加网页抓取与定时同步
-- 增加多轮会话与收藏回答
-- 增加更强的 reranker
-- 增加 OCR PDF 支持
-- 增加登录鉴权与多用户隔离
+- 网页抓取与定时同步
+- 更强的 reranker
+- OCR PDF 支持
+- 多轮会话与收藏回答
+- 登录鉴权与多用户隔离
 
 ## 相关文档
 

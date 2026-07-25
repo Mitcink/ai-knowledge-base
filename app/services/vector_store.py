@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Any
 
@@ -53,36 +53,15 @@ class VectorStore:
 
         must_conditions: list[models.FieldCondition] = []
         if category_filter:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="category",
-                    match=models.MatchValue(value=category_filter),
-                )
-            )
+            must_conditions.append(models.FieldCondition(key="category", match=models.MatchValue(value=category_filter)))
         if source_filter:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="source",
-                    match=models.MatchValue(value=source_filter),
-                )
-            )
+            must_conditions.append(models.FieldCondition(key="source", match=models.MatchValue(value=source_filter)))
         if file_type_filter:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="tags",
-                    match=models.MatchValue(value=file_type_filter),
-                )
-            )
+            must_conditions.append(models.FieldCondition(key="file_type", match=models.MatchValue(value=file_type_filter)))
         if tag_filter:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="tags",
-                    match=models.MatchValue(value=tag_filter),
-                )
-            )
+            must_conditions.append(models.FieldCondition(key="tags", match=models.MatchValue(value=tag_filter)))
 
         query_filter = models.Filter(must=must_conditions) if must_conditions else None
-
         results = self._client.search(
             collection_name=self._collection,
             query_vector=query_vector,
@@ -90,15 +69,10 @@ class VectorStore:
             limit=limit,
             with_payload=True,
         )
-        normalized = []
+
+        normalized: list[dict[str, Any]] = []
         for item in results:
-            payload = item.payload or {}
-            normalized.append(
-                {
-                    "score": float(item.score),
-                    "payload": payload,
-                }
-            )
+            normalized.append({"score": float(item.score), "payload": item.payload or {}})
         return normalized
 
     def list_indexed_documents(self) -> list[dict[str, Any]]:
@@ -120,40 +94,62 @@ class VectorStore:
                 file_path = str(payload.get("file_path", "")).strip()
                 if not file_path:
                     continue
+
                 entry = documents.setdefault(
                     file_path,
                     {
                         "file_path": file_path,
-                        "filename": file_path.replace("\\", "/").split("/")[-1],
-                        "title": payload.get("title", ""),
+                        "filename": str(payload.get("filename") or file_path.replace("\\", "/").split("/")[-1]),
+                        "title": str(payload.get("title", "")),
                         "source_label": str(payload.get("source", "manual")),
                         "category": str(payload.get("category", "general")),
+                        "file_type": str(payload.get("file_type", "")).lower(),
+                        "updated_at": str(payload.get("updated_at", "")) or None,
+                        "ingested_at": str(payload.get("ingested_at", "")) or None,
                         "chunk_count": 0,
                     },
                 )
                 entry["chunk_count"] += 1
+                if payload.get("updated_at"):
+                    entry["updated_at"] = str(payload["updated_at"])
+                if payload.get("ingested_at"):
+                    entry["ingested_at"] = str(payload["ingested_at"])
             if next_offset is None:
                 break
 
         return sorted(documents.values(), key=lambda item: item["file_path"])
 
-    def delete_by_file_path(self, file_path: str) -> None:
+    def count_by_file_path(self, file_path: str) -> int:
         if not self.collection_exists():
-            return
+            return 0
+        return int(
+            self._client.count(
+                collection_name=self._collection,
+                exact=True,
+                count_filter=models.Filter(
+                    must=[models.FieldCondition(key="file_path", match=models.MatchValue(value=file_path))]
+                ),
+            ).count
+        )
+
+    def delete_by_file_path(self, file_path: str) -> int:
+        if not self.collection_exists():
+            return 0
+
+        matched_points = self.count_by_file_path(file_path)
+        if matched_points == 0:
+            return 0
+
         self._client.delete(
             collection_name=self._collection,
             points_selector=models.FilterSelector(
                 filter=models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="file_path",
-                            match=models.MatchValue(value=file_path),
-                        )
-                    ]
+                    must=[models.FieldCondition(key="file_path", match=models.MatchValue(value=file_path))]
                 )
             ),
             wait=True,
         )
+        return matched_points
 
     def count_points(self) -> int:
         if not self.collection_exists():

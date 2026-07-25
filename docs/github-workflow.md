@@ -17,11 +17,12 @@ git push -u origin main
 
 ## 2. 推荐提交节奏
 
-建议按功能提交，而不是一次性混在一起：
+建议按功能提交，而不是把大量无关改动混在一起：
 
 - `init project scaffold`
 - `add ingestion pipeline`
-- `add query api and ui`
+- `improve query workflow and citations`
+- `refine document management experience`
 - `add deployment docs`
 
 ## 3. 推荐分支策略
@@ -35,43 +36,45 @@ git push -u origin main
 - `main`
 - `feature/*`
 
-## 4. 推荐 README 长期维护内容
+## 4. README 需要长期同步的内容
 
 每次功能升级后，记得同步 README：
 
 - 当前支持哪些文档类型
 - 当前部署方式
 - 当前环境变量
+- 当前核心能力
 - 已知限制
 - 下一步计划
 
 ## 5. 推荐增加的 GitHub Actions
 
-第一版建议只做最基础检查：
+当前最值得保留的检查是：
 
-- Python 语法检查
-- Docker Compose 配置检查
+- Python 语法和导入检查
+- 基础 CI smoke check
 
-后续可以再加：
+后续可以继续增加：
 
 - 单元测试
 - lint
+- Docker Compose 配置校验
 - 自动构建镜像
 
-## 6. 适合你的维护习惯
+## 6. 适合这个项目的维护习惯
 
 因为这个项目是你自己的知识库，最重要的不是“代码看起来多高级”，而是：
 
-- 资料持续进入
-- 搜索体验持续变好
+- 资料能持续进入
+- 搜索体验能持续变好
 - 部署不要太脆弱
-- 出问题时你自己能修
+- 出问题时你自己能快速定位和修复
 
-所以建议你每次迭代只改一层：
+所以建议每次迭代只改一层：
 
 - 要么改导入
 - 要么改检索
-- 要么改前端
-- 要么改部署
+- 要么改前端体验
+- 要么改部署和运维
 
-这样最稳。
+这样最稳，也更方便回滚。
