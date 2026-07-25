@@ -3,6 +3,19 @@ const state = {
   filterOptions: null,
 };
 
+const statusLabels = {
+  indexed: "文件+索引",
+  pending_index: "仅文件",
+  orphaned_index: "仅索引",
+  external_index: "外部索引",
+};
+
+const deleteWarnings = {
+  "delete-index": "将删除向量索引，文档文件会保留。删除后该文档暂时不可被问答检索，可重新同步恢复索引。",
+  "delete-file": "将删除磁盘上的文档文件，当前索引会保留。之后仍可能检索到旧片段，建议只在需要保留检索历史时使用。",
+  "delete-both": "将同时删除文档文件和向量索引。该操作不可撤销，删除后需要重新上传或恢复文件。",
+};
+
 const elements = {
   systemStatus: document.getElementById("systemStatus"),
   systemDetail: document.getElementById("systemDetail"),
@@ -68,16 +81,17 @@ function fillSelect(select, items, includeAll = true, placeholder = "全部") {
   items.forEach((item) => {
     const option = document.createElement("option");
     option.value = item;
-    option.textContent = item;
+    option.textContent = statusLabels[item] || item;
     select.appendChild(option);
   });
 }
 
 async function loadOverview() {
   const overview = await apiRequest("/api/documents/overview");
-  elements.systemStatus.textContent = overview.qdrant_reachable ? "就绪" : "降级";
+  elements.systemStatus.textContent = overview.qdrant_reachable ? "运行正常" : "服务降级";
+  elements.systemStatus.classList.toggle("degraded", !overview.qdrant_reachable);
   elements.systemDetail.textContent = overview.qdrant_reachable
-    ? `API、向量库与索引可用。当前 collection：${overview.collection}`
+    ? `API 与向量库可用，当前 collection：${overview.collection}`
     : "Qdrant 当前不可达，请优先检查向量库状态。";
   elements.totalDocuments.textContent = overview.total_documents;
   elements.indexedDocuments.textContent = overview.indexed_documents;
@@ -122,55 +136,55 @@ function renderDocuments() {
     return true;
   });
 
-  elements.documentsSummary.textContent = `当前显示 ${filtered.length} / ${state.documents.length} 份文档。`;
+  elements.documentsSummary.textContent = `当前显示 ${filtered.length} / ${state.documents.length} 份文档`;
 
   if (!filtered.length) {
-    elements.documentsTable.innerHTML = `<tr><td colspan="9" class="empty-row">没有符合当前筛选条件的文档</td></tr>`;
+    elements.documentsTable.innerHTML = `<tr><td colspan="8" class="empty-row">没有符合当前筛选条件的文档。</td></tr>`;
     return;
   }
 
-  elements.documentsTable.innerHTML = filtered
-    .map((doc) => {
-      const removable = doc.storage_area === "raw" || doc.storage_area === "upload";
-      return `
-        <tr>
-          <td>
-            <div class="doc-name">
-              <strong>${escapeHtml(doc.filename)}</strong>
-              <span class="doc-path">${escapeHtml(doc.relative_path)}</span>
-            </div>
-          </td>
-          <td><span class="status-badge status-${escapeHtml(doc.status)}">${escapeHtml(doc.status)}</span></td>
-          <td>${escapeHtml(doc.category)}</td>
-          <td>${escapeHtml(doc.source_label)}</td>
-          <td>${escapeHtml(doc.file_type)}</td>
-          <td>${escapeHtml(doc.storage_area)}</td>
-          <td>${doc.chunk_count}</td>
-          <td>${escapeHtml(doc.relative_path)}</td>
-          <td>
-            ${
-              removable
-                ? `
-              <div class="doc-actions">
-                <button class="action-button" data-action="delete-index" data-storage="${escapeHtml(doc.storage_area)}" data-path="${escapeHtml(doc.relative_path)}">删索引</button>
-                <button class="action-button" data-action="delete-file" data-storage="${escapeHtml(doc.storage_area)}" data-path="${escapeHtml(doc.relative_path)}">删文件</button>
-                <button class="action-button danger" data-action="delete-both" data-storage="${escapeHtml(doc.storage_area)}" data-path="${escapeHtml(doc.relative_path)}">全部删除</button>
-              </div>
-            `
-                : `<span class="doc-path">仅可查看，不可直接删除</span>`
-            }
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+  elements.documentsTable.innerHTML = filtered.map(renderDocumentRow).join("");
+}
+
+function renderDocumentRow(doc) {
+  const removable = doc.storage_area === "raw" || doc.storage_area === "upload";
+  return `
+    <tr>
+      <td>
+        <div class="doc-name">
+          <strong>${escapeHtml(doc.filename)}</strong>
+          <span class="doc-path">${escapeHtml(doc.relative_path)}</span>
+        </div>
+      </td>
+      <td><span class="status-badge status-${escapeHtml(doc.status)}">${escapeHtml(statusLabels[doc.status] || doc.status)}</span></td>
+      <td>${escapeHtml(doc.category)}</td>
+      <td>${escapeHtml(doc.source_label)}</td>
+      <td>${escapeHtml(doc.file_type)}</td>
+      <td>${escapeHtml(doc.storage_area)}</td>
+      <td>${doc.chunk_count}</td>
+      <td>
+        ${
+          removable
+            ? `
+          <div class="doc-actions">
+            <button class="action-button" title="删除索引，保留文件" data-action="delete-index" data-storage="${escapeHtml(doc.storage_area)}" data-path="${escapeHtml(doc.relative_path)}">删索引</button>
+            <button class="action-button" title="删除文件，保留索引" data-action="delete-file" data-storage="${escapeHtml(doc.storage_area)}" data-path="${escapeHtml(doc.relative_path)}">删文件</button>
+            <button class="action-button danger" data-action="delete-both" data-storage="${escapeHtml(doc.storage_area)}" data-path="${escapeHtml(doc.relative_path)}">全部删除</button>
+          </div>
+        `
+            : `<span class="doc-path">仅可查看</span>`
+        }
+      </td>
+    </tr>
+  `;
 }
 
 async function initialize() {
   try {
     await Promise.all([loadOverview(), loadFilters(), loadDocuments()]);
   } catch (error) {
-    elements.systemStatus.textContent = "错误";
+    elements.systemStatus.textContent = "加载失败";
+    elements.systemStatus.classList.add("degraded");
     elements.systemDetail.textContent = error.message;
   }
 }
@@ -180,14 +194,15 @@ async function askQuestion(event) {
   const question = elements.questionInput.value.trim();
   if (!question) {
     elements.queryStatus.textContent = "请输入问题。";
+    elements.questionInput.focus();
     return;
   }
 
-  elements.queryStatus.textContent = "正在回答...";
+  elements.queryStatus.textContent = "正在生成回答...";
   elements.answerBox.classList.remove("empty");
-  elements.answerBox.textContent = "";
+  elements.answerBox.textContent = "正在整理回答...";
   elements.citationsBox.classList.remove("empty");
-  elements.citationsBox.innerHTML = "";
+  elements.citationsBox.textContent = "正在检索引用片段...";
 
   try {
     const payload = {
@@ -205,9 +220,10 @@ async function askQuestion(event) {
       body: JSON.stringify(payload),
     });
 
-    elements.queryStatus.textContent = `回答完成，共返回 ${result.citations.length} 条引用。`;
+    const citations = result.citations || [];
+    elements.queryStatus.textContent = `回答完成，返回 ${citations.length} 条引用。`;
     elements.answerBox.textContent = result.answer || "没有返回回答内容。";
-    renderCitations(result.citations || []);
+    renderCitations(citations);
   } catch (error) {
     elements.queryStatus.textContent = `请求失败：${error.message}`;
     elements.answerBox.textContent = `请求失败：${error.message}`;
@@ -235,7 +251,7 @@ function renderCitations(citations) {
     const content = node.querySelector(".citation-content");
 
     title.textContent = `${citation.filename} · ${citation.chunk_id}`;
-    score.textContent = `score ${citation.score}`;
+    score.textContent = `相关度 ${Number(citation.score).toFixed(3)}`;
     preview.textContent = citation.excerpt || "无摘要";
     meta.textContent = citation.file_path || citation.title || "";
     content.textContent = citation.excerpt || "无内容";
@@ -254,7 +270,7 @@ async function syncRawDirectory() {
 
   try {
     const result = await apiRequest("/api/documents/ingest/raw", { method: "POST" });
-    elements.syncStatus.textContent = `同步完成，本次处理了 ${result.ingested_count} 个文件。`;
+    elements.syncStatus.textContent = `同步完成，本次处理 ${result.ingested_count} 个文件。`;
     elements.syncResult.textContent = JSON.stringify(result, null, 2);
     elements.syncResult.classList.remove("hidden");
     await initialize();
@@ -266,7 +282,7 @@ async function syncRawDirectory() {
 async function uploadSingleDocument(event) {
   event.preventDefault();
   if (!elements.uploadFile.files.length) {
-    elements.uploadStatus.textContent = "请先选择要上传的文件。";
+    elements.uploadStatus.textContent = "请先选择要上传的文档。";
     return;
   }
 
@@ -310,7 +326,7 @@ async function handleTableAction(event) {
     return;
   }
 
-  const confirmed = window.confirm(`${options.label}：${relativePath}？此操作不可撤销。`);
+  const confirmed = window.confirm(`${options.label}：${relativePath}\n\n${deleteWarnings[action]}\n\n确认继续？`);
   if (!confirmed) {
     return;
   }
@@ -347,6 +363,7 @@ function bindEvents() {
   document.getElementById("clearQueryBtn").addEventListener("click", () => {
     elements.questionInput.value = "";
     elements.queryStatus.textContent = "";
+    elements.questionInput.focus();
   });
   document.getElementById("syncBtn").addEventListener("click", syncRawDirectory);
   document.getElementById("queryForm").addEventListener("submit", askQuestion);
