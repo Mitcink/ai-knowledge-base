@@ -258,7 +258,7 @@ function renderDocumentRow(doc) {
 async function refreshWorkspace() {
   if (state.isRefreshing) return;
   state.isRefreshing = true;
-  setButtonBusy(elements.refreshAllBtn, true, "检查中...", "重新检查");
+  setButtonBusy(elements.refreshAllBtn, true, "刷新中...", "刷新");
   elements.systemStatus.textContent = "检查中";
   elements.systemStatus.classList.remove("degraded");
   elements.systemDetail.textContent = "正在刷新概览、筛选项和文档列表。";
@@ -275,7 +275,7 @@ async function refreshWorkspace() {
     elements.systemDetail.textContent = `刷新失败：${formatError(error)}`;
   } finally {
     state.isRefreshing = false;
-    setButtonBusy(elements.refreshAllBtn, false, "检查中...", "重新检查");
+    setButtonBusy(elements.refreshAllBtn, false, "刷新中...", "刷新");
   }
 }
 
@@ -327,6 +327,11 @@ async function askQuestion(event) {
 
 function setTextbox(node, text, empty) {
   node.classList.toggle("empty", empty);
+  if ("value" in node) {
+    node.value = text;
+    node.scrollTop = 0;
+    return;
+  }
   node.textContent = text;
 }
 
@@ -353,7 +358,7 @@ function renderCitations(citations, debug) {
     })
     .join("\n\n---\n\n");
   const debugText = formatDebugBlock(debug);
-  elements.citationsBox.textContent = `${citationText}${debugText ? `\n\n---\n\n${debugText}` : ""}`;
+  setTextbox(elements.citationsBox, `${citationText}${debugText ? `\n\n---\n\n${debugText}` : ""}`, false);
 }
 
 async function syncRawDirectory() {

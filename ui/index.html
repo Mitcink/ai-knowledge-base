@@ -10,26 +10,21 @@
     <div class="app-shell">
       <header class="app-header">
         <div class="brand">
-          <span class="brand-mark">KB</span>
-          <div>
-            <strong>AI Knowledge Base</strong>
-            <span>个人知识库工作台</span>
-          </div>
-        </div>
-        <div class="header-status" aria-live="polite">
-          <span id="systemStatus" class="status-pill">检查中</span>
-          <span id="systemDetail" class="header-detail">正在检查 API 与向量库配置。</span>
-        </div>
-        <div class="header-actions">
-          <button id="refreshAllBtn" class="button subtle" type="button">重新检查</button>
+          <strong>AI Knowledge Base</strong>
         </div>
       </header>
 
       <div class="workspace">
         <section class="overview-grid" aria-label="系统概览">
           <article class="metric-card metric-status">
-            <span>系统就绪度</span>
-            <strong>连接状态和配置问题会显示在顶部状态栏</strong>
+            <div class="metric-card-head">
+              <span>系统状态</span>
+              <button id="refreshAllBtn" class="text-button" type="button">刷新</button>
+            </div>
+            <div class="status-line" aria-live="polite">
+              <span id="systemStatus" class="status-pill">检查中</span>
+              <strong id="systemDetail">正在检查 API 与向量库配置。</strong>
+            </div>
           </article>
           <article class="metric-card">
             <span>文档总数</span>
@@ -118,7 +113,7 @@
                   <h2>回答</h2>
                   <span>Answer</span>
                 </div>
-                <div id="answerBox" class="result-textbox empty">还没有回答，请先输入问题。</div>
+                <textarea id="answerBox" class="result-textbox empty" readonly>还没有回答，请先输入问题。</textarea>
               </article>
 
               <article class="result-panel">
@@ -126,7 +121,7 @@
                   <h2>引用片段</h2>
                   <span>Citations</span>
                 </div>
-                <div id="citationsBox" class="result-textbox citations-textbox empty">回答完成后，引用片段会显示在这里。</div>
+                <textarea id="citationsBox" class="result-textbox citations-textbox empty" readonly>回答完成后，引用片段会显示在这里。</textarea>
               </article>
             </section>
           </section>
