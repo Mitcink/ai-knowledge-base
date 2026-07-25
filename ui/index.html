@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Knowledge Base</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">AI Knowledge Base</p>
+          <h1>个人知识库工作台</h1>
+          <p class="subtitle">导入资料、构建索引、问答检索，都放在一个页面里完成。</p>
+        </div>
+        <div class="hero-actions">
+          <button id="refreshAllBtn" class="button secondary">刷新状态</button>
+          <a class="button ghost" href="/docs" target="_blank" rel="noreferrer">API Docs</a>
+        </div>
+      </header>
+
+      <section class="status-grid">
+        <article class="card">
+          <span class="label">系统状态</span>
+          <strong id="systemStatus">加载中</strong>
+          <small id="systemDetail">正在检测 API 与向量库。</small>
+        </article>
+        <article class="card">
+          <span class="label">文档总数</span>
+          <strong id="totalDocuments">-</strong>
+          <small>已纳入工作台管理的文档总量</small>
+        </article>
+        <article class="card">
+          <span class="label">已索引</span>
+          <strong id="indexedDocuments">-</strong>
+          <small>已经写入向量索引的文档数</small>
+        </article>
+        <article class="card">
+          <span class="label">向量片段</span>
+          <strong id="totalChunks">-</strong>
+          <small>当前知识库中的切片总量</small>
+        </article>
+      </section>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="search">问答</button>
+        <button class="tab" data-tab="ingest">导入</button>
+        <button class="tab" data-tab="manage">文档</button>
+      </nav>
+
+      <main>
+        <section id="tab-search" class="panel active">
+          <div class="panel-header">
+            <div>
+              <h2>知识库问答</h2>
+              <p>优先从已导入的知识库中回答，并返回引用片段。</p>
+            </div>
+          </div>
+
+          <form id="queryForm" class="stack">
+            <label class="field">
+              <span>问题</span>
+              <textarea id="questionInput" rows="5" placeholder="例如：Agent 的最小架构包含哪些部分？"></textarea>
+            </label>
+
+            <div class="filters">
+              <label class="field">
+                <span>分类</span>
+                <select id="categoryFilter"></select>
+              </label>
+              <label class="field">
+                <span>来源</span>
+                <select id="sourceFilter"></select>
+              </label>
+              <label class="field">
+                <span>文件类型</span>
+                <select id="fileTypeFilter"></select>
+              </label>
+              <label class="field">
+                <span>Top K</span>
+                <select id="topK">
+                  <option>3</option>
+                  <option>4</option>
+                  <option>5</option>
+                  <option selected>6</option>
+                  <option>8</option>
+                  <option>10</option>
+                  <option>12</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="submit" class="button primary" id="askBtn">开始回答</button>
+              <span id="queryStatus" class="inline-status"></span>
+            </div>
+          </form>
+
+          <div class="result-grid">
+            <article class="card result-card">
+              <div class="card-header">
+                <h3>回答</h3>
+              </div>
+              <div id="answerBox" class="answer-box empty">还没有结果，先提一个问题。</div>
+            </article>
+
+            <article class="card citations-card">
+              <div class="card-header">
+                <h3>引用片段</h3>
+              </div>
+              <div id="citationsBox" class="citations-box empty">回答后会在这里显示引用片段。</div>
+            </article>
+          </div>
+        </section>
+
+        <section id="tab-ingest" class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>导入与同步</h2>
+              <p>建议把长期维护的资料放进 <code>data/raw/</code>，再执行同步。</p>
+            </div>
+          </div>
+
+          <div class="card stack">
+            <div>
+              <h3>批量同步 data/raw</h3>
+              <p>会扫描 <code>data/raw/</code> 下的支持格式文件，并重建对应索引。</p>
+            </div>
+            <div class="actions">
+              <button id="syncBtn" class="button primary">同步原始目录</button>
+              <span id="syncStatus" class="inline-status"></span>
+            </div>
+            <pre id="syncResult" class="code-block hidden"></pre>
+          </div>
+        </section>
+
+        <section id="tab-manage" class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>文档总览</h2>
+              <p>查看已纳管文档、索引状态和来源信息。</p>
+            </div>
+            <button id="refreshDocsBtn" class="button secondary">刷新列表</button>
+          </div>
+
+          <div class="table-wrap card">
+            <table>
+              <thead>
+                <tr>
+                  <th>文件名</th>
+                  <th>状态</th>
+                  <th>分类</th>
+                  <th>来源</th>
+                  <th>类型</th>
+                  <th>区域</th>
+                  <th>片段数</th>
+                  <th>路径</th>
+                </tr>
+              </thead>
+              <tbody id="documentsTable">
+                <tr><td colspan="8" class="empty-row">加载中</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

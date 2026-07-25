@@ -5,24 +5,9 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-COPY requirements-ui.txt .
-RUN pip install --no-cache-dir -r requirements-ui.txt
-
 COPY ui ./ui
 
-CMD [
-  "streamlit",
-  "run",
-  "ui/streamlit_app.py",
-  "--server.port",
-  "8501",
-  "--server.address",
-  "0.0.0.0",
-  "--server.headless",
-  "true",
-  "--server.fileWatcherType",
-  "none",
-  "--browser.gatherUsageStats",
-  "false"
-]
+WORKDIR /app/ui
+
+CMD ["python", "-m", "http.server", "8501", "--bind", "0.0.0.0"]
 
