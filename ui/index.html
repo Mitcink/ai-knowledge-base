@@ -8,39 +8,31 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="主导航">
-        <div class="brand-block">
+      <header class="app-header">
+        <div class="brand">
           <span class="brand-mark">AI</span>
           <div>
-            <strong>Knowledge Base</strong>
-            <small>个人知识库控制台</small>
+            <strong>AI Knowledge Base</strong>
+            <span>知识库工作台</span>
           </div>
         </div>
-
-        <nav class="tabs">
-          <button class="tab active" type="button" data-tab="search">问答工作台</button>
-          <button class="tab" type="button" data-tab="ingest">导入与同步</button>
-          <button class="tab" type="button" data-tab="manage">文档治理</button>
-        </nav>
-
-        <div class="sidebar-footer">
-          <button id="refreshAllBtn" class="button secondary full" type="button">刷新状态</button>
-          <a class="button ghost full" href="/docs" target="_blank" rel="noreferrer">API 文档</a>
+        <div class="header-actions">
+          <span id="systemStatus" class="status-pill">加载中</span>
+          <button id="refreshAllBtn" class="button subtle" type="button">重新检查</button>
         </div>
-      </aside>
+      </header>
 
       <div class="workspace">
-        <header class="topbar">
+        <div class="workspace-intro">
           <div>
             <p class="eyebrow">RAG Workspace</p>
-            <h1>AI 知识库工作台</h1>
-            <p>统一完成资料导入、索引同步、知识问答和文档治理。</p>
+            <h1>知识库工作台</h1>
+            <p>检索已整理的资料，核对回答依据，并管理文档索引状态。</p>
           </div>
-          <div class="status-pill" id="systemStatus">加载中</div>
-        </header>
+        </div>
 
         <section class="overview-grid" aria-label="系统概览">
-          <article class="metric-card">
+          <article class="metric-card metric-status">
             <span>连接状态</span>
             <strong id="systemDetail">正在检查 API 与向量库。</strong>
           </article>
@@ -58,120 +50,122 @@
           </article>
         </section>
 
+        <nav class="tabs" aria-label="工作台模块">
+          <button class="tab active" type="button" data-tab="search">问答工作台</button>
+          <button class="tab" type="button" data-tab="ingest">导入与同步</button>
+          <button class="tab" type="button" data-tab="manage">文档治理</button>
+        </nav>
+
         <main>
           <section id="tab-search" class="panel active">
             <div class="panel-head">
               <div>
                 <h2>问答工作台</h2>
-                <p>左侧配置问题与检索范围，右侧并排阅读回答和引用片段，便于快速核对来源。</p>
+                <p>输入问题并限定检索范围，回答和引用会在固定高度的文本区内独立滚动。</p>
               </div>
             </div>
 
-            <div class="qa-workbench">
-              <section class="control-panel">
-                <form id="queryForm" class="query-form">
-                  <label class="field question-field">
-                    <span>问题</span>
-                    <textarea
-                      id="questionInput"
-                      placeholder="例如：Agent 的最小架构包含哪些部分？Prompt、Tool、Memory 和 Loop 分别扮演什么角色？"
-                    ></textarea>
+            <section class="query-panel">
+              <form id="queryForm" class="query-form">
+                <label class="field question-field">
+                  <span>问题</span>
+                  <textarea id="questionInput" placeholder="例如：Agent 的最小架构包含哪些部分？"></textarea>
+                </label>
+
+                <div class="filters-grid">
+                  <label class="field">
+                    <span>分类</span>
+                    <select id="categoryFilter"></select>
                   </label>
+                  <label class="field">
+                    <span>来源</span>
+                    <select id="sourceFilter"></select>
+                  </label>
+                  <label class="field">
+                    <span>文件类型</span>
+                    <select id="fileTypeFilter"></select>
+                  </label>
+                  <label class="field">
+                    <span>引用数量</span>
+                    <select id="topK">
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6" selected>6</option>
+                      <option value="8">8</option>
+                      <option value="10">10</option>
+                      <option value="12">12</option>
+                    </select>
+                  </label>
+                </div>
 
-                  <div class="filters-grid compact-grid">
-                    <label class="field">
-                      <span>分类</span>
-                      <select id="categoryFilter"></select>
-                    </label>
-                    <label class="field">
-                      <span>来源</span>
-                      <select id="sourceFilter"></select>
-                    </label>
-                    <label class="field">
-                      <span>类型</span>
-                      <select id="fileTypeFilter"></select>
-                    </label>
-                    <label class="field">
-                      <span>引用数</span>
-                      <select id="topK">
-                        <option>3</option>
-                        <option>4</option>
-                        <option>5</option>
-                        <option selected>6</option>
-                        <option>8</option>
-                        <option>10</option>
-                        <option>12</option>
-                      </select>
-                    </label>
-                  </div>
+                <div class="query-actions">
+                  <button id="askBtn" class="button primary" type="submit">开始回答</button>
+                  <button id="clearQueryBtn" class="button secondary" type="button">清空问题</button>
+                  <span id="queryStatus" class="status-text"></span>
+                </div>
+              </form>
+            </section>
 
-                  <div class="actions-row">
-                    <button id="askBtn" class="button primary" type="submit">开始回答</button>
-                    <button id="clearQueryBtn" class="button secondary" type="button">清空</button>
-                  </div>
-                  <p id="queryStatus" class="status-text"></p>
-                </form>
-              </section>
+            <section class="result-grid" aria-label="问答结果">
+              <article class="result-panel">
+                <div class="section-title">
+                  <h3>回答</h3>
+                  <span>Answer</span>
+                </div>
+                <div id="answerBox" class="result-textbox empty">还没有回答，请先输入问题。</div>
+              </article>
 
-              <section class="result-grid" aria-label="问答结果">
-                <article class="result-panel">
-                  <div class="section-title">
-                    <h3>回答</h3>
-                    <span>Answer</span>
-                  </div>
-                  <div id="answerBox" class="scroll-box empty">还没有回答，先输入一个问题。</div>
-                </article>
-
-                <article class="result-panel">
-                  <div class="section-title">
-                    <h3>引用片段</h3>
-                    <span>Citations</span>
-                  </div>
-                  <div id="citationsBox" class="scroll-box empty">回答后会在这里显示可核对的引用片段。</div>
-                </article>
-              </section>
-            </div>
+              <article class="result-panel">
+                <div class="section-title">
+                  <h3>引用片段</h3>
+                  <span>Citations</span>
+                </div>
+                <div id="citationsBox" class="result-textbox citations-textbox empty">回答完成后，引用片段会显示在这里。</div>
+              </article>
+            </section>
           </section>
 
           <section id="tab-ingest" class="panel">
             <div class="panel-head">
               <div>
                 <h2>导入与同步</h2>
-                <p>长期资料建议维护在 <code>data/raw/</code>，零散资料可直接上传并写入索引。</p>
+                <p>长期资料放入 <code>data/raw/</code> 后批量同步，临时资料可以单独上传。</p>
               </div>
             </div>
 
             <div class="ingest-flow">
-              <section class="flow-step stack">
-                <div>
-                  <div class="section-title">
-                    <h3>批量同步目录</h3>
-                    <span>Step 01</span>
+              <section class="flow-step">
+                <div class="flow-heading">
+                  <div>
+                    <span class="step-label">01</span>
+                    <h3>同步原始目录</h3>
                   </div>
-                  <p>扫描 <code>data/raw/</code> 下所有支持格式文件，并重建或覆盖对应索引。适合长期维护的主题资料。</p>
+                  <span class="flow-hint">适合长期维护的资料</span>
                 </div>
-                <div class="actions-row">
-                  <button id="syncBtn" class="button primary" type="button">同步原始目录</button>
+                <p>扫描 <code>data/raw/</code> 下的支持格式文件，并更新对应的向量索引。</p>
+                <div class="action-line">
+                  <button id="syncBtn" class="button primary" type="button">同步目录</button>
                   <span id="syncStatus" class="status-text"></span>
                 </div>
                 <pre id="syncResult" class="code-block hidden"></pre>
               </section>
 
               <section class="flow-step">
-                <form id="uploadForm" class="stack">
-                  <div>
-                    <div class="section-title">
+                <form id="uploadForm" class="upload-form">
+                  <div class="flow-heading">
+                    <div>
+                      <span class="step-label">02</span>
                       <h3>上传单个文档</h3>
-                      <span>Step 02</span>
                     </div>
-                    <p>适合临时补充资料。支持 <code>md</code>、<code>markdown</code>、<code>txt</code>、<code>pdf</code>。</p>
+                    <span class="flow-hint">适合临时补充资料</span>
                   </div>
+                  <p>支持 <code>md</code>、<code>markdown</code>、<code>txt</code>、<code>pdf</code>。</p>
                   <label class="field">
                     <span>选择文件</span>
                     <input id="uploadFile" type="file" accept=".md,.markdown,.txt,.pdf" />
                   </label>
-
-                  <div class="filters-grid">
+                  <div class="form-grid">
                     <label class="field">
                       <span>来源标签</span>
                       <input id="uploadSource" type="text" value="upload" />
@@ -181,8 +175,7 @@
                       <input id="uploadCategory" type="text" value="general" />
                     </label>
                   </div>
-
-                  <div class="actions-row">
+                  <div class="action-line">
                     <button id="uploadBtn" class="button primary" type="submit">上传并索引</button>
                     <span id="uploadStatus" class="status-text"></span>
                   </div>
@@ -195,38 +188,41 @@
             <div class="panel-head">
               <div>
                 <h2>文档治理</h2>
-                <p>按文件名、分类、来源和状态筛选，统一查看磁盘文件与索引状态。</p>
+                <p>搜索文件并按已有的分类、来源和索引状态筛选。没有数据时，筛选器会明确显示不可用原因。</p>
               </div>
             </div>
 
-            <div class="section-card toolbar-card">
-              <div class="toolbar-grid">
-                <label class="field">
-                  <span>搜索文件名</span>
-                  <input id="docSearchInput" type="text" placeholder="例如：agent、prompt、glossary" />
-                </label>
-                <label class="field">
-                  <span>分类</span>
-                  <select id="manageCategoryFilter"></select>
-                </label>
-                <label class="field">
-                  <span>来源</span>
-                  <select id="manageSourceFilter"></select>
-                </label>
-                <label class="field">
-                  <span>状态</span>
-                  <select id="manageStatusFilter"></select>
-                </label>
-              </div>
-              <div class="toolbar-actions">
-                <button id="refreshDocsBtn" class="button secondary compact" type="button">刷新</button>
-                <button id="resetDocFiltersBtn" class="button ghost compact" type="button">重置筛选</button>
-              </div>
-            </div>
+            <section class="manage-toolbar">
+              <label class="field search-field">
+                <span>搜索文件</span>
+                <input id="docSearchInput" type="search" placeholder="输入文件名或路径关键词" />
+              </label>
+              <label class="field">
+                <span>按已有分类</span>
+                <select id="manageCategoryFilter"></select>
+              </label>
+              <label class="field">
+                <span>按已有来源</span>
+                <select id="manageSourceFilter"></select>
+              </label>
+              <label class="field">
+                <span>按索引状态</span>
+                <select id="manageStatusFilter"></select>
+              </label>
+              <button id="resetDocFiltersBtn" class="button secondary reset-button" type="button">重置筛选</button>
+            </section>
 
-            <div class="table-card">
+            <section class="status-legend" aria-label="文档状态说明">
+              <span><b class="dot dot-success"></b>文件和索引：可被问答检索</span>
+              <span><b class="dot dot-warning"></b>仅文件：需要同步后才能检索</span>
+              <span><b class="dot dot-danger"></b>仅索引：文件缺失但旧片段仍可能被检索</span>
+              <span><b class="dot dot-danger"></b>外部索引：不属于 raw/upload 管理范围</span>
+            </section>
+
+            <section class="table-card">
               <div class="table-meta">
                 <span id="documentsSummary">正在加载文档列表。</span>
+                <button id="refreshDocsBtn" class="text-button" type="button">刷新列表</button>
               </div>
               <div class="table-wrap">
                 <table>
@@ -243,32 +239,15 @@
                     </tr>
                   </thead>
                   <tbody id="documentsTable">
-                    <tr><td colspan="8" class="empty-row">加载中</td></tr>
+                    <tr><td colspan="8" class="empty-row">正在加载</td></tr>
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>
           </section>
         </main>
       </div>
     </div>
-
-    <template id="citationTemplate">
-      <details class="citation-card">
-        <summary>
-          <div class="citation-summary">
-            <strong class="citation-title"></strong>
-            <span class="citation-score"></span>
-          </div>
-          <p class="citation-preview"></p>
-        </summary>
-        <div class="citation-body">
-          <div class="citation-meta"></div>
-          <pre class="citation-content"></pre>
-        </div>
-      </details>
-    </template>
-
     <script src="./app.js" defer></script>
   </body>
 </html>
