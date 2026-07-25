@@ -13,11 +13,11 @@
 ## 文档入口
 
 - [文档总览](./docs/README.md)
-- [Agent 知识库总览](./docs/agent/README.md)
-- [建设路线图](./docs/agent/roadmap.md)
-- [Agent 快速入门](./docs/agent/agent-basics.md)
-- [核心术语表](./docs/agent/glossary.md)
-- [资料筛选与沉淀原则](./docs/agent/curation-policy.md)
+- [Agent 知识库总览](./data/raw/agent/README.md)
+- [建设路线图](./data/raw/agent/roadmap.md)
+- [Agent 快速入门](./data/raw/agent/agent-basics.md)
+- [核心术语表](./data/raw/agent/glossary.md)
+- [资料筛选与沉淀原则](./data/raw/agent/curation-policy.md)
 
 ## 项目结构
 
@@ -92,6 +92,11 @@ docker compose exec api python scripts/ingest.py
 - `.markdown`
 - `.txt`
 - `.pdf`
+
+建议后续把可检索知识文档直接维护在这些目录下：
+
+- `data/raw/agent/`
+- 后续可继续扩展 `data/raw/prompt/`、`data/raw/mcp/`、`data/raw/harness/` 等
 
 ## 已有项目文档
 

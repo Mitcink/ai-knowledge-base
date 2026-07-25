@@ -13,11 +13,13 @@
 
 ## AI Agent 知识库
 
-- [Agent 知识库总览](./agent/README.md)
-- [建设路线图](./agent/roadmap.md)
-- [Agent 快速入门](./agent/agent-basics.md)
-- [核心术语表](./agent/glossary.md)
-- [资料筛选与沉淀原则](./agent/curation-policy.md)
+以下正文已经迁到 `data/raw/agent/`，这样系统同步 `data/raw/` 时可以直接识别并入库：
+
+- [Agent 知识库总览](../data/raw/agent/README.md)
+- [建设路线图](../data/raw/agent/roadmap.md)
+- [Agent 快速入门](../data/raw/agent/agent-basics.md)
+- [核心术语表](../data/raw/agent/glossary.md)
+- [资料筛选与沉淀原则](../data/raw/agent/curation-policy.md)
 
 ## 维护约定
 

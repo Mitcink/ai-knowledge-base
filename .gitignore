@@ -8,6 +8,8 @@ __pycache__/
 data/raw/*
 data/processed/*
 !data/raw/.gitkeep
+!data/raw/agent/
+!data/raw/agent/**
 !data/processed/.gitkeep
 qdrant_storage/
 streamlit/.streamlit/secrets.toml
