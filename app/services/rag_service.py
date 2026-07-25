@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from openai import NotFoundError
 from openai import OpenAI
 from qdrant_client.http import models
 
@@ -12,6 +14,8 @@ from app.services.chunking import split_text
 from app.services.document_loader import is_supported_file, load_document_text
 from app.services.embeddings import get_embedding_client
 from app.services.vector_store import get_vector_store
+
+logger = logging.getLogger(__name__)
 
 
 class RagService:
@@ -201,16 +205,43 @@ class RagService:
             raise RuntimeError("OPENAI_API_KEY 尚未配置，无法生成问答结果。")
 
         context = "\n\n".join(context_blocks) if context_blocks else "No relevant context found."
-        prompt = (
+        system_prompt = (
             "You are answering only from the provided knowledge base context.\n"
             "Use the user's language.\n"
             "Be concise, practical, and explicit about uncertainty.\n"
-            "If the context is insufficient, say what is missing instead of inventing facts.\n\n"
-            f"Question:\n{question}\n\n"
-            f"Context:\n{context}"
+            "If the context is insufficient, say what is missing instead of inventing facts."
         )
-        response = self._llm_client.responses.create(model=self._settings.llm_model, input=prompt)
-        return response.output_text
+        user_prompt = f"Question:\n{question}\n\nContext:\n{context}"
+
+        try:
+            response = self._llm_client.responses.create(
+                model=self._settings.llm_model,
+                input=f"{system_prompt}\n\n{user_prompt}",
+            )
+            return response.output_text
+        except NotFoundError:
+            logger.warning("Responses API not supported by current LLM provider, falling back to chat completions.")
+        except Exception as exc:
+            logger.warning("Responses API failed, falling back to chat completions: %s", exc)
+
+        chat_response = self._llm_client.chat.completions.create(
+            model=self._settings.llm_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        message = chat_response.choices[0].message
+        content = getattr(message, "content", None)
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "\n".join(
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("type") == "text"
+            ).strip()
+        raise RuntimeError("LLM returned an unexpected response shape.")
 
     def _infer_category(self, root_directory: Path, path: Path) -> str:
         try:
