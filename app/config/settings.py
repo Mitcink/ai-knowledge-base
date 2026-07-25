@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     llm_model: str = "gpt-4.1-mini"
+    embedding_api_key: str = ""
+    embedding_base_url: str = ""
     embedding_model: str = "text-embedding-3-small"
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "knowledge_base"
@@ -35,6 +37,10 @@ class Settings(BaseSettings):
             raise ValueError("CHUNK_OVERLAP must be smaller than MAX_CHUNK_SIZE")
         if self.top_k <= 0:
             raise ValueError("TOP_K must be greater than 0")
+        if not self.embedding_base_url:
+            self.embedding_base_url = self.openai_base_url
+        if not self.embedding_api_key:
+            self.embedding_api_key = self.openai_api_key
         return self
 
 
