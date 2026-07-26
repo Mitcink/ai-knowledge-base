@@ -20,6 +20,14 @@
 - [Agent 快速入门](../data/raw/agent/agent-basics.md)
 - [核心术语表](../data/raw/agent/glossary.md)
 - [资料筛选与沉淀原则](../data/raw/agent/curation-policy.md)
+- [Prompt 与上下文工程](../data/raw/agent/prompt-context-engineering.md)
+- [Tool、Skill 与 MCP](../data/raw/agent/tool-skill-and-mcp.md)
+- [Memory、State 与上下文管理](../data/raw/agent/memory-state-and-context.md)
+- [Loop、Workflow 与 Human-in-the-Loop](../data/raw/agent/loop-workflow-and-human-review.md)
+- [Harness、Eval 与观测](../data/raw/agent/harness-eval-and-observability.md)
+- [Safety、权限边界与产品化](../data/raw/agent/safety-and-productization.md)
+- [主流 Agent 框架与平台](../data/raw/agent/frameworks-and-platforms.md)
+- [真实业务里的 Agent 模式](../data/raw/agent/real-world-agent-patterns.md)
 
 ## 维护约定
 

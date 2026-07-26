@@ -28,9 +28,14 @@
 1. [建设路线图](./roadmap.md)
 2. [Agent 快速入门](./agent-basics.md)
 3. [核心术语表](./glossary.md)
-4. Prompt、Tool、Memory、Loop 相关专题
-5. 单 Agent 实战
-6. 多 Agent / Workflow / Harness / Eval
+4. [Prompt 与上下文工程](./prompt-context-engineering.md)
+5. [Tool、Skill 与 MCP](./tool-skill-and-mcp.md)
+6. [Memory、State 与上下文管理](./memory-state-and-context.md)
+7. [Loop、Workflow 与 Human-in-the-Loop](./loop-workflow-and-human-review.md)
+8. [Harness、Eval 与观测](./harness-eval-and-observability.md)
+9. [Safety、权限边界与产品化](./safety-and-productization.md)
+10. [主流 Agent 框架与平台](./frameworks-and-platforms.md)
+11. [真实业务里的 Agent 模式](./real-world-agent-patterns.md)
 
 ## 知识库写法
 
@@ -51,3 +56,14 @@
 - 统一术语
 - 可持续扩展的文档模板
 - 一条可执行的 Agent 学习与搭建路径
+
+## 当前已落库专题
+
+- [Prompt 与上下文工程](./prompt-context-engineering.md)
+- [Tool、Skill 与 MCP](./tool-skill-and-mcp.md)
+- [Memory、State 与上下文管理](./memory-state-and-context.md)
+- [Loop、Workflow 与 Human-in-the-Loop](./loop-workflow-and-human-review.md)
+- [Harness、Eval 与观测](./harness-eval-and-observability.md)
+- [Safety、权限边界与产品化](./safety-and-productization.md)
+- [主流 Agent 框架与平台](./frameworks-and-platforms.md)
+- [真实业务里的 Agent 模式](./real-world-agent-patterns.md)
